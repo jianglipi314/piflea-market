@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Pi跳蚤市场 · 先锋二手</title>
+    <style>
+        /* 样式与之前精致版基本一致，保持美观 */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f8f8fc; padding-bottom: 70px; }
+        .status-bar { background: white; padding: 12px 16px 6px; font-size: 14px; font-weight: 500; display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; }
+        .page { display: none; min-height: calc(100vh - 70px); }
+        .page.active { display: block; }
+        .tab-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.96); backdrop-filter: blur(10px); display: flex; justify-content: space-around; padding: 8px 0 16px; border-top: 0.5px solid #e9e9ef; box-shadow: 0 -2px 12px rgba(0,0,0,0.04); z-index: 100; }
+        .tab-item { text-align: center; flex: 1; cursor: pointer; color: #8e8e93; font-size: 10px; transition: color 0.2s; }
+        .tab-item.active { color: #007aff; }
+        .tab-icon { font-size: 24px; margin-bottom: 4px; }
+        .search-section { background: white; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }
+        .search-box { background: #f2f2f6; border-radius: 30px; padding: 10px 16px; display: flex; gap: 8px; margin-bottom: 12px; }
+        .search-box input { flex: 1; border: none; background: transparent; font-size: 16px; outline: none; }
+        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .filter-chip { background: #f2f2f6; padding: 6px 14px; border-radius: 30px; font-size: 14px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .filter-chip.active { background: #007aff; color: white; }
+        .sort-chip { background: #f2f2f6; padding: 6px 14px; border-radius: 30px; font-size: 14px; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        .product-card { background: white; margin: 12px 16px; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.04); display: flex; cursor: pointer; transition: transform 0.15s; }
+        .product-card:active { transform: scale(0.98); }
+        .product-img { width: 110px; height: 110px; object-fit: cover; background: #e9e9ef; }
+        .product-info { flex: 1; padding: 12px; position: relative; }
+        .product-title { font-weight: 600; font-size: 16px; margin-bottom: 4px; padding-right: 30px; }
+        .product-price { color: #ff3b30; font-weight: 700; font-size: 18px; margin: 8px 0; }
+        .product-price::before { content: "π "; font-size: 14px; }
+        .product-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #8e8e93; }
+        .favorite-icon { position: absolute; right: 12px; top: 12px; font-size: 22px; cursor: pointer; }
+        .swiper-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+        .swiper-container img { width: 100%; flex-shrink: 0; scroll-snap-align: start; object-fit: cover; height: 350px; background: #e9e9ef; }
+        .detail-info { padding: 20px; }
+        .detail-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .detail-price { font-size: 32px; font-weight: 800; color: #ff3b30; margin: 12px 0; }
+        .seller-card { background: #f8f8fc; border-radius: 16px; padding: 16px; margin: 16px 0; display: flex; align-items: center; gap: 12px; }
+        .seller-avatar { width: 48px; height: 48px; background: #c4c4c4; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .other-products { margin: 20px 0; }
+        .other-item { display: flex; align-items: center; gap: 12px; background: white; border-radius: 16px; padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: pointer; }
+        .other-img { width: 50px; height: 50px; object-fit: cover; border-radius: 12px; }
+        .copy-btn, .contact-btn, .edit-btn { background: #007aff; color: white; border: none; width: 100%; padding: 14px; border-radius: 40px; font-weight: 600; font-size: 16px; margin-top: 12px; cursor: pointer; }
+        .contact-btn { background: #34c759; }
+        .edit-btn { background: #ff9f0a; }
+        .form-card { background: white; margin: 16px; border-radius: 24px; padding: 20px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { font-weight: 500; margin-bottom: 8px; display: block; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 14px; border: 1px solid #e9e9ef; border-radius: 16px; font-size: 16px; background: #f8f8fc; }
+        .image-preview-list { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+        .image-preview-item { position: relative; width: 80px; height: 80px; }
+        .image-preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
+        .remove-img { position: absolute; top: -8px; right: -8px; background: #ff3b30; color: white; border-radius: 20px; width: 22px; height: 22px; text-align: center; line-height: 20px; font-size: 14px; cursor: pointer; }
+        .add-image-btn { width: 80px; height: 80px; background: #f2f2f6; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 32px; color: #8e8e93; cursor: pointer; }
+        .submit-btn { background: #ff3b30; color: white; width: 100%; padding: 16px; border-radius: 40px; font-weight: 700; font-size: 18px; border: none; margin-top: 20px; }
+        .my-header { background: white; padding: 24px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #f0f0f0; }
+        .my-avatar { width: 64px; height: 64px; background: #007aff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; }
+        .my-product-list { padding: 16px; }
+        .my-item { background: white; border-radius: 20px; padding: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .my-item-actions { display: flex; gap: 8px; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+        .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 8px 20px; border-radius: 40px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div class="status-bar"><span>9:41</span><span>📶 🔋 100%</span></div>
+
+<div id="listPage" class="page active">
+    <div class="search-section">
+        <div class="search-box"><span>🔍</span><input type="text" id="searchInput" placeholder="搜索商品..."></div>
+        <div class="filter-row">
+            <div class="filter-chip" data-cat="all">全部</div>
+            <div class="filter-chip" data-cat="手机数码">📱 数码</div>
+            <div class="filter-chip" data-cat="家居生活">🏠 家居</div>
+            <div class="filter-chip" data-cat="图书音像">📚 图书</div>
+            <div class="sort-chip" id="sortBtn">💰 价格 ↑</div>
+        </div>
+    </div>
+    <div id="productListContainer"></div>
+</div>
+
+<div id="detailPage" class="page">
+    <div style="padding: 12px 16px 0;"><button onclick="showPage('listPage')" style="background:none; border:none; font-size:28px;">←</button></div>
+    <div id="detailContent"></div>
+</div>
+
+<div id="publishPage" class="page">
+    <div class="form-card">
+        <h2 style="margin-bottom: 16px;">✨ 发布闲置</h2>
+        <div class="form-group"><input type="text" id="pubTitle" placeholder="标题 *"></div>
+        <div class="form-group"><textarea id="pubDesc" rows="3" placeholder="描述 *"></textarea></div>
+        <div class="form-group"><input type="number" id="pubPrice" step="0.1" placeholder="价格 (π) *"></div>
+        <div class="form-group"><select id="pubCategory"><option>手机数码</option><option>家居生活</option><option>图书音像</option><option>服饰鞋包</option><option>其他</option></select></div>
+        <div class="form-group"><input type="text" id="pubCity" placeholder="城市 *"></div>
+        <div class="form-group"><input type="text" id="pubContact" placeholder="联系方式 (微信/Telegram) *"></div>
+        <div class="form-group">
+            <label>图片</label>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <div class="add-image-btn" id="addImageBtn">+</div>
+                <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none">
+                <div id="imagePreviewList" class="image-preview-list"></div>
+            </div>
+        </div>
+        <button class="submit-btn" id="submitPublish">发布 · 支付0.1 π</button>
+    </div>
+</div>
+
+<div id="profilePage" class="page">
+    <div class="my-header">
+        <div class="my-avatar">👤</div>
+        <div><strong>Pi先锋</strong><br><span style="font-size:12px; color:#8e8e93;">已认证</span></div>
+    </div>
+    <div class="my-product-list">
+        <h3 style="margin-bottom: 12px;">📦 我的发布</h3>
+        <div id="myProductsContainer"></div>
+    </div>
+</div>
+
+<div class="tab-bar">
+    <div class="tab-item active" data-page="listPage"><div class="tab-icon">🏠</div><div>首页</div></div>
+    <div class="tab-item" data-page="publishPage"><div class="tab-icon">📤</div><div>发布</div></div>
+    <div class="tab-item" data-page="profilePage"><div class="tab-icon">👤</div><div>我的</div></div>
+</div>
+<div id="toast" class="toast">提示</div>
+
+<script>
+    // ================== 配置 ==================
+    // 【重要】将下面 PLATFORM_WALLET 改为你自己的 Pi 钱包公钥地址（用于接收发布费0.1 Pi）
+    const PLATFORM_WALLET = "GA7QYNF7SOWQ3GLR2BGMZEH3UM4I6Y2VQY2K5Q3M3K7X6X5H5X4X3W2X1"; // 替换为真实钱包
+    // 是否启用真实Pi SDK支付（设为true将在Pi Browser中尝试真实支付）
+    const ENABLE_REAL_PI_PAYMENT = true;
+    
+    // 模拟当前用户（实际应从 Pi SDK 获取）
+    let currentUser = {
+        nickname: "Pi先锋_" + Math.floor(Math.random()*1000),
+        walletAddress: "GA7QYNF7SOWQ3GLR2BGMZEH3UM4I6Y2VQY2K5Q3M3K7X6X5H5X4X3W2X1", // 临时
+        contact: "tg: @pioneer"
+    };
+    
+    // 尝试初始化 Pi SDK
+    let piSDKReady = false;
+    if (typeof window.Pi !== 'undefined' && ENABLE_REAL_PI_PAYMENT) {
+        window.Pi.init({ version: "2.0", sandbox: false }).then(() => {
+            piSDKReady = true;
+            console.log("Pi SDK initialized");
+            // 获取真实用户信息
+            window.Pi.authenticate(['username', 'wallet_address']).then(auth => {
+                currentUser.nickname = auth.username || currentUser.nickname;
+                currentUser.walletAddress = auth.wallet_address || currentUser.walletAddress;
+                document.querySelector(".my-header strong").innerText = currentUser.nickname;
+            }).catch(e => console.warn("Auth failed", e));
+        }).catch(e => console.warn("Pi SDK init failed", e));
+    } else {
+        console.log("Using mock payment mode");
+    }
+    
+    // ================== 数据 ==================
+    let defaultProducts = [
+        { id: "p1", title: "iPhone 12 黑色", description: "9成新，无拆修，电池85%", price: 25, category: "手机数码", city: "佳木斯", images: ["https://picsum.photos/id/0/400/400"], seller: "数码哥", sellerWallet: "GA7...W2X1", contact: "微信: iphone123", time: Date.now(), status: "active", favorites: 0 },
+        { id: "p2", title: "小米手环7", description: "全新未拆封", price: 8, category: "手机数码", city: "哈尔滨", images: ["https://picsum.photos/id/20/400/400"], seller: "运动君", sellerWallet: "GB8...X2X2", contact: "tg: @mi", time: Date.now()-86400000, status: "active", favorites: 0 },
+        { id: "p3", title: "宜家书桌", description: "白色1.2米，几乎全新", price: 15, category: "家居生活", city: "佳木斯", images: ["https://picsum.photos/id/100/400/400"], seller: "家居刘", sellerWallet: "GC9...Y3Y3", contact: "微信: yijia", time: Date.now()-172800000, status: "active", favorites: 0 }
+    ];
+    let products = [];
+    let uploadImages = [];
+    let currentSort = "asc";
+    let favoriteMap = JSON.parse(localStorage.getItem("favorites") || "{}");
+    let editingProductId = null; // 编辑模式时存储当前编辑的商品id
+    
+    function loadData() {
+        let stored = localStorage.getItem("pi_flea_v4");
+        if(stored) {
+            products = JSON.parse(stored);
+            let defaultIds = defaultProducts.map(p=>p.id);
+            let existingIds = products.map(p=>p.id);
+            for(let dp of defaultProducts) if(!existingIds.includes(dp.id)) products.unshift(dp);
+        } else products = [...defaultProducts];
+        saveData();
+    }
+    function saveData() { localStorage.setItem("pi_flea_v4", JSON.stringify(products)); }
+    function saveFavorites() { localStorage.setItem("favorites", JSON.stringify(favoriteMap)); }
+    function showToast(msg) { let t=document.getElementById("toast"); t.innerText=msg; t.style.opacity="1"; setTimeout(()=>t.style.opacity="0",2000); }
+    function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m=> m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+    
+    // 渲染首页
+    function renderList() {
+        let keyword = document.getElementById("searchInput").value.trim().toLowerCase();
+        let activeCat = document.querySelector(".filter-chip.active")?.dataset.cat || "all";
+        let filtered = products.filter(p => p.status === "active");
+        if(keyword) filtered = filtered.filter(p => p.title.toLowerCase().includes(keyword) || p.description.toLowerCase().includes(keyword));
+        if(activeCat !== "all") filtered = filtered.filter(p => p.category === activeCat);
+        filtered.sort((a,b) => currentSort === "asc" ? a.price - b.price : b.price - a.price);
+        const container = document.getElementById("productListContainer");
+        if(filtered.length===0) { container.innerHTML = '<div class="empty-state">🌟 暂无商品，去发布一个吧</div>'; return; }
+        container.innerHTML = filtered.map(p => {
+            let isFav = favoriteMap[p.id] || false;
+            return `<div class="product-card" onclick="goDetail('${p.id}')">
+                <img class="product-img" src="${p.images[0]}" onerror="this.src='https://picsum.photos/id/1/110/110'">
+                <div class="product-info">
+                    <div class="product-title">${escapeHtml(p.title)}</div>
+                    <div class="product-price">${p.price}</div>
+                    <div class="product-meta"><span>📍 ${escapeHtml(p.city)}</span><span>❤️ ${p.favorites||0}</span></div>
+                    <div class="favorite-icon" onclick="event.stopPropagation(); toggleFavorite('${p.id}')">${isFav ? '❤️' : '🤍'}</div>
+                </div>
+            </div>`;
+        }).join("");
+    }
+    function toggleFavorite(id) { if(favoriteMap[id]) delete favoriteMap[id]; else favoriteMap[id]=true; saveFavorites(); renderList(); }
+    
+    // 详情页
+    function goDetail(id) {
+        let p = products.find(x=>x.id===id);
+        if(!p) return;
+        let imagesHtml = `<div class="swiper-container">` + p.images.map(img => `<img src="${img}">`).join('') + `</div>`;
+        // 同卖家其他商品
+        let otherProducts = products.filter(x => x.sellerWallet === p.sellerWallet && x.id !== p.id && x.status === "active").slice(0,3);
+        let otherHtml = otherProducts.length ? `<div class="other-products"><strong>Ta的其他商品</strong>${otherProducts.map(op => `
+            <div class="other-item" onclick="goDetail('${op.id}')">
+                <img class="other-img" src="${op.images[0]}">
+                <div><div>${escapeHtml(op.title)}</div><div style="color:#ff3b30;">π ${op.price}</div></div>
+            </div>`).join('')}</div>` : '';
+        document.getElementById("detailContent").innerHTML = `
+            ${imagesHtml}
+            <div class="detail-info">
+                <div class="detail-title">${escapeHtml(p.title)}</div>
+                <div class="detail-price">π ${p.price}</div>
+                <div class="seller-card"><div class="seller-avatar">👤</div><div><strong>${escapeHtml(p.seller)}</strong><br><span style="font-size:12px;">${escapeHtml(p.city)}</span></div></div>
+                <div style="margin:16px 0;"><strong>描述</strong><br>${escapeHtml(p.description)}</div>
+                ${otherHtml}
+                <button class="copy-btn" onclick="copyWallet('${p.sellerWallet}')">📋 复制卖家钱包</button>
+                <button class="contact-btn" onclick="showToast('联系: ${p.contact}')">💬 联系卖家</button>
+            </div>
+        `;
+        showPage("detailPage");
+    }
+    function copyWallet(wallet) { navigator.clipboard.writeText(wallet); showToast("钱包地址已复制，请去Pi Wallet转账"); }
+    
+    // 发布（真实支付或模拟）
+    async function publishProduct() {
+        let title = document.getElementById("pubTitle").value.trim();
+        let desc = document.getElementById("pubDesc").value.trim();
+        let price = parseFloat(document.getElementById("pubPrice").value);
+        let category = document.getElementById("pubCategory").value;
+        let city = document.getElementById("pubCity").value.trim();
+        let contact = document.getElementById("pubContact").value.trim();
+        if(!title || !desc || isNaN(price) || !city || !contact) { showToast("请填写完整信息"); return false; }
+        
+        // 支付流程
+        let paymentSuccess = false;
+        if (piSDKReady && ENABLE_REAL_PI_PAYMENT && typeof window.Pi !== 'undefined') {
+            try {
+                const paymentData = {
+                    amount: 0.1,
+                    memo: "Pi跳蚤市场发布商品费用",
+                    metadata: { productTitle: title },
+                    to: PLATFORM_WALLET
+                };
+                const payment = await window.Pi.createPayment(paymentData);
+                // 等待支付完成
+                await new Promise((resolve, reject) => {
+                    payment.onReadyForServerApproval(() => resolve());
+                    // 简化处理，实际需要后端验证，这里前端信任
+                });
+                paymentSuccess = true;
+                showToast("支付成功！商品已发布");
+            } catch(e) {
+                console.error(e);
+                showToast("支付失败或取消");
+                return false;
+            }
+        } else {
+            if(!confirm("模拟支付0.1 π，确定发布？")) return false;
+            paymentSuccess = true;
+        }
+        
+        if(paymentSuccess) {
+            let images = uploadImages.length ? uploadImages : ["https://picsum.photos/id/26/400/400"];
+            let newProduct = {
+                id: Date.now()+'-'+Math.random().toString(36).substr(2,6),
+                title, description: desc, price, category, city,
+                images, seller: currentUser.nickname, sellerWallet: currentUser.walletAddress, contact,
+                time: Date.now(), status: "active", favorites: 0
+            };
+            products.unshift(newProduct);
+            saveData();
+            // 清空表单
+            document.getElementById("pubTitle").value = "";
+            document.getElementById("pubDesc").value = "";
+            document.getElementById("pubPrice").value = "";
+            document.getElementById("pubCity").value = "";
+            document.getElementById("pubContact").value = "";
+            uploadImages = [];
+            renderImagePreviews();
+            showToast("发布成功！");
+            renderList();
+            return true;
+        }
+        return false;
+    }
+    
+    // 编辑商品
+    function editProduct(id) {
+        let product = products.find(p => p.id === id);
+        if(!product) return;
+        editingProductId = id;
+        // 填充表单
+        document.getElementById("pubTitle").value = product.title;
+        document.getElementById("pubDesc").value = product.description;
+        document.getElementById("pubPrice").value = product.price;
+        document.getElementById("pubCategory").value = product.category;
+        document.getElementById("pubCity").value = product.city;
+        document.getElementById("pubContact").value = product.contact;
+        uploadImages = [...product.images];
+        renderImagePreviews();
+        // 修改按钮文字和功能
+        let submitBtn = document.getElementById("submitPublish");
+        submitBtn.innerText = "保存修改";
+        submitBtn.onclick = saveEdit;
+        showPage("publishPage");
+    }
+    function saveEdit() {
+        let title = document.getElementById("pubTitle").value.trim();
+        let desc = document.getElementById("pubDesc").value.trim();
+        let price = parseFloat(document.getElementById("pubPrice").value);
+        let category = document.getElementById("pubCategory").value;
+        let city = document.getElementById("pubCity").value.trim();
+        let contact = document.getElementById("pubContact").value.trim();
+        if(!title || !desc || isNaN(price) || !city || !contact) { showToast("请填写完整"); return; }
+        let idx = products.findIndex(p => p.id === editingProductId);
+        if(idx !== -1) {
+            products[idx] = { ...products[idx], title, description: desc, price, category, city, contact, images: uploadImages.length ? uploadImages : products[idx].images };
+            saveData();
+            showToast("修改成功");
+        }
+        // 重置发布按钮
+        document.getElementById("submitPublish").innerText = "发布 · 支付0.1 π";
+        document.getElementById("submitPublish").onclick = () => publishProduct();
+        editingProductId = null;
+        // 清空表单
+        document.getElementById("pubTitle").value = "";
+        document.getElementById("pubDesc").value = "";
+        document.getElementById("pubPrice").value = "";
+        document.getElementById("pubCity").value = "";
+        document.getElementById("pubContact").value = "";
+        uploadImages = [];
+        renderImagePreviews();
+        showPage("profilePage");
+        renderMyProducts();
+        renderList();
+    }
+    
+    // 图片上传
+    function setupImageUpload() {
+        const fileInput = document.getElementById("imageFileInput");
+        document.getElementById("addImageBtn").onclick = () => fileInput.click();
+        fileInput.onchange = (e) => {
+            let files = Array.from(e.target.files);
+            let remain = 6 - uploadImages.length;
+            files.slice(0, remain).forEach(f => {
+                let reader = new FileReader();
+                reader.onload = ev => { uploadImages.push(ev.target.result); renderImagePreviews(); };
+                reader.readAsDataURL(f);
+            });
+            fileInput.value = "";
+        };
+    }
+    function renderImagePreviews() {
+        let container = document.getElementById("imagePreviewList");
+        container.innerHTML = uploadImages.map((img, idx) => `<div class="image-preview-item"><img src="${img}"><div class="remove-img" onclick="removeImage(${idx})">✕</div></div>`).join("");
+    }
+    window.removeImage = function(idx) { uploadImages.splice(idx,1); renderImagePreviews(); };
+    
+    // 我的页面
+    function renderMyProducts() {
+        let my = products.filter(p => p.sellerWallet === currentUser.walletAddress && p.status === "active");
+        let container = document.getElementById("myProductsContainer");
+        if(my.length===0) { container.innerHTML = '<div class="empty-state">还没有发布过商品</div>'; return; }
+        container.innerHTML = my.map(p => `
+            <div class="my-item">
+                <div><strong>${escapeHtml(p.title)}</strong><br><span style="color:#ff3b30;">π ${p.price}</span><br><span style="font-size:12px;">${escapeHtml(p.city)}</span></div>
+                <div class="my-item-actions">
+                    <button onclick="editProduct('${p.id}')" style="background:#ff9f0a; color:white; border:none; padding:6px 16px; border-radius:30px;">编辑</button>
+                    <button onclick="deleteMyProduct('${p.id}')" style="background:#ff3b30; color:white; border:none; padding:6px 16px; border-radius:30px;">下架</button>
+                </div>
+            </div>
+        `).join("");
+    }
+    function deleteMyProduct(id) {
+        let idx = products.findIndex(p=>p.id===id);
+        if(idx!==-1) { products[idx].status = "sold"; saveData(); renderMyProducts(); renderList(); showToast("已下架"); }
+    }
+    
+    // 页面切换
+    function showPage(pageId) {
+        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        document.querySelectorAll('.tab-item').forEach(tab=>tab.classList.remove('active'));
+        document.querySelector(`.tab-item[data-page="${pageId}"]`).classList.add('active');
+        if(pageId === 'listPage') renderList();
+        if(pageId === 'profilePage') renderMyProducts();
+    }
+    
+    // 初始化
+    window.onload = () => {
+        loadData();
+        renderList();
+        setupImageUpload();
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.onclick = () => { document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active')); chip.classList.add('active'); renderList(); };
+        });
+        document.getElementById("sortBtn").onclick = () => {
+            currentSort = currentSort === "asc" ? "desc" : "asc";
+            document.getElementById("sortBtn").innerHTML = currentSort === "asc" ? "💰 价格 ↑" : "💰 价格 ↓";
+            renderList();
+        };
+        document.getElementById("searchInput").addEventListener("input", renderList);
+        document.getElementById("submitPublish").onclick = () => publishProduct();
+        document.querySelectorAll('.tab-item').forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
+        window.goDetail = goDetail;
+        window.copyWallet = copyWallet;
+        window.deleteMyProduct = deleteMyProduct;
+        window.toggleFavorite = toggleFavorite;
+        window.editProduct = editProduct;
+    };
+</script>
+</body>
+</html>
