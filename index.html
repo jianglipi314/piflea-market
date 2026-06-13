@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Pi跳蚤市场 · 先锋二手</title>
+    <!-- 引入 Pi SDK (v2) -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <style>
-        /* 样式与之前精致版基本一致，保持美观 */
+        /* 样式与之前一致，省略重复代码（实际使用时会保留完整样式） */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f8f8fc; padding-bottom: 70px; }
         .status-bar { background: white; padding: 12px 16px 6px; font-size: 14px; font-weight: 500; display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; }
@@ -109,7 +111,7 @@
 <div id="profilePage" class="page">
     <div class="my-header">
         <div class="my-avatar">👤</div>
-        <div><strong>Pi先锋</strong><br><span style="font-size:12px; color:#8e8e93;">已认证</span></div>
+        <div><strong id="userNickname">Pi先锋</strong><br><span style="font-size:12px; color:#8e8e93;" id="userStatus">未认证</span></div>
     </div>
     <div class="my-product-list">
         <h3 style="margin-bottom: 12px;">📦 我的发布</h3>
@@ -126,36 +128,76 @@
 
 <script>
     // ================== 配置 ==================
-    // 【重要】将下面 PLATFORM_WALLET 改为你自己的 Pi 钱包公钥地址（用于接收发布费0.1 Pi）
-    const PLATFORM_WALLET = "GA7QYNF7SOWQ3GLR2BGMZEH3UM4I6Y2VQY2K5Q3M3K7X6X5H5X4X3W2X1"; // 替换为真实钱包
-    // 是否启用真实Pi SDK支付（设为true将在Pi Browser中尝试真实支付）
-    const ENABLE_REAL_PI_PAYMENT = true;
+    // ⚠️ 重要：将下面 PLATFORM_WALLET 改为你自己的 Pi 钱包公钥地址（用于接收发布费0.1 Pi）
+    const PLATFORM_WALLET = "GA7QYNF7SOWQ3GLR2BGMZEH3UM4I6Y2VQY2K5Q3M3K7X6X5H5X4X3W2X1"; // 请替换为真实钱包地址
+    const ENABLE_REAL_PI_PAYMENT = true;   // 开启真实支付（需在 Pi Browser 中生效）
     
-    // 模拟当前用户（实际应从 Pi SDK 获取）
+    // 全局用户对象（将从 Pi SDK 填充）
     let currentUser = {
-        nickname: "Pi先锋_" + Math.floor(Math.random()*1000),
-        walletAddress: "GA7QYNF7SOWQ3GLR2BGMZEH3UM4I6Y2VQY2K5Q3M3K7X6X5H5X4X3W2X1", // 临时
-        contact: "tg: @pioneer"
+        nickname: "访客",
+        walletAddress: "",
+        contact: ""
     };
     
-    // 尝试初始化 Pi SDK
     let piSDKReady = false;
-    if (typeof window.Pi !== 'undefined' && ENABLE_REAL_PI_PAYMENT) {
-        window.Pi.init({ version: "2.0", sandbox: false }).then(() => {
+    let isAuthenticated = false;
+    
+    // ================== Pi SDK 身份验证（自动触发） ==================
+    async function initPiAndAuthenticate() {
+        // 检查是否在 Pi Browser 中
+        if (typeof window.Pi === 'undefined') {
+            console.warn("Not in Pi Browser, using mock mode.");
+            document.getElementById("userStatus").innerText = "演示模式";
+            // 使用模拟用户（仅用于本地测试）
+            currentUser = {
+                nickname: "演示用户",
+                walletAddress: "GA7DEMO...",
+                contact: "demo@pi"
+            };
+            updateUserUI();
+            return;
+        }
+        
+        try {
+            // 初始化 Pi SDK (sandbox: false 主网, true 测试网)
+            await window.Pi.init({ version: "2.0", sandbox: false });
             piSDKReady = true;
             console.log("Pi SDK initialized");
-            // 获取真实用户信息
-            window.Pi.authenticate(['username', 'wallet_address']).then(auth => {
-                currentUser.nickname = auth.username || currentUser.nickname;
-                currentUser.walletAddress = auth.wallet_address || currentUser.walletAddress;
-                document.querySelector(".my-header strong").innerText = currentUser.nickname;
-            }).catch(e => console.warn("Auth failed", e));
-        }).catch(e => console.warn("Pi SDK init failed", e));
-    } else {
-        console.log("Using mock payment mode");
+            
+            // 自动触发身份验证（会弹出 Pi 授权窗口）
+            const auth = await window.Pi.authenticate(['username', 'wallet_address']);
+            if (auth && auth.username) {
+                currentUser.nickname = auth.username;
+                currentUser.walletAddress = auth.wallet_address || "";
+                currentUser.contact = `pi://user/${auth.username}`;
+                isAuthenticated = true;
+                document.getElementById("userStatus").innerText = "已认证";
+                console.log("Authenticated user:", currentUser);
+            } else {
+                throw new Error("Authentication failed");
+            }
+        } catch (error) {
+            console.error("Pi SDK init or auth error:", error);
+            document.getElementById("userStatus").innerText = "认证失败，使用演示模式";
+            // 降级为模拟用户
+            currentUser = {
+                nickname: "演示用户",
+                walletAddress: "GA7DEMO...",
+                contact: "demo@pi"
+            };
+        }
+        updateUserUI();
     }
     
-    // ================== 数据 ==================
+    function updateUserUI() {
+        const nicknameSpan = document.getElementById("userNickname");
+        if (nicknameSpan) nicknameSpan.innerText = currentUser.nickname;
+        // 刷新我的页面中的商品列表（因为卖家地址可能变化）
+        if (typeof renderMyProducts === 'function') renderMyProducts();
+        if (typeof renderList === 'function') renderList();
+    }
+    
+    // ================== 原有数据与函数 ==================
     let defaultProducts = [
         { id: "p1", title: "iPhone 12 黑色", description: "9成新，无拆修，电池85%", price: 25, category: "手机数码", city: "佳木斯", images: ["https://picsum.photos/id/0/400/400"], seller: "数码哥", sellerWallet: "GA7...W2X1", contact: "微信: iphone123", time: Date.now(), status: "active", favorites: 0 },
         { id: "p2", title: "小米手环7", description: "全新未拆封", price: 8, category: "手机数码", city: "哈尔滨", images: ["https://picsum.photos/id/20/400/400"], seller: "运动君", sellerWallet: "GB8...X2X2", contact: "tg: @mi", time: Date.now()-86400000, status: "active", favorites: 0 },
@@ -165,7 +207,7 @@
     let uploadImages = [];
     let currentSort = "asc";
     let favoriteMap = JSON.parse(localStorage.getItem("favorites") || "{}");
-    let editingProductId = null; // 编辑模式时存储当前编辑的商品id
+    let editingProductId = null;
     
     function loadData() {
         let stored = localStorage.getItem("pi_flea_v4");
@@ -182,7 +224,6 @@
     function showToast(msg) { let t=document.getElementById("toast"); t.innerText=msg; t.style.opacity="1"; setTimeout(()=>t.style.opacity="0",2000); }
     function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m=> m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
     
-    // 渲染首页
     function renderList() {
         let keyword = document.getElementById("searchInput").value.trim().toLowerCase();
         let activeCat = document.querySelector(".filter-chip.active")?.dataset.cat || "all";
@@ -207,12 +248,10 @@
     }
     function toggleFavorite(id) { if(favoriteMap[id]) delete favoriteMap[id]; else favoriteMap[id]=true; saveFavorites(); renderList(); }
     
-    // 详情页
     function goDetail(id) {
         let p = products.find(x=>x.id===id);
         if(!p) return;
         let imagesHtml = `<div class="swiper-container">` + p.images.map(img => `<img src="${img}">`).join('') + `</div>`;
-        // 同卖家其他商品
         let otherProducts = products.filter(x => x.sellerWallet === p.sellerWallet && x.id !== p.id && x.status === "active").slice(0,3);
         let otherHtml = otherProducts.length ? `<div class="other-products"><strong>Ta的其他商品</strong>${otherProducts.map(op => `
             <div class="other-item" onclick="goDetail('${op.id}')">
@@ -235,7 +274,6 @@
     }
     function copyWallet(wallet) { navigator.clipboard.writeText(wallet); showToast("钱包地址已复制，请去Pi Wallet转账"); }
     
-    // 发布（真实支付或模拟）
     async function publishProduct() {
         let title = document.getElementById("pubTitle").value.trim();
         let desc = document.getElementById("pubDesc").value.trim();
@@ -245,9 +283,9 @@
         let contact = document.getElementById("pubContact").value.trim();
         if(!title || !desc || isNaN(price) || !city || !contact) { showToast("请填写完整信息"); return false; }
         
-        // 支付流程
         let paymentSuccess = false;
-        if (piSDKReady && ENABLE_REAL_PI_PAYMENT && typeof window.Pi !== 'undefined') {
+        // 真实支付（仅在 Pi Browser 且已认证时）
+        if (piSDKReady && isAuthenticated && ENABLE_REAL_PI_PAYMENT && typeof window.Pi !== 'undefined') {
             try {
                 const paymentData = {
                     amount: 0.1,
@@ -256,10 +294,9 @@
                     to: PLATFORM_WALLET
                 };
                 const payment = await window.Pi.createPayment(paymentData);
-                // 等待支付完成
                 await new Promise((resolve, reject) => {
                     payment.onReadyForServerApproval(() => resolve());
-                    // 简化处理，实际需要后端验证，这里前端信任
+                    // 实际生产环境应调用后端验证，这里简化处理
                 });
                 paymentSuccess = true;
                 showToast("支付成功！商品已发布");
@@ -283,7 +320,6 @@
             };
             products.unshift(newProduct);
             saveData();
-            // 清空表单
             document.getElementById("pubTitle").value = "";
             document.getElementById("pubDesc").value = "";
             document.getElementById("pubPrice").value = "";
@@ -298,12 +334,10 @@
         return false;
     }
     
-    // 编辑商品
     function editProduct(id) {
         let product = products.find(p => p.id === id);
         if(!product) return;
         editingProductId = id;
-        // 填充表单
         document.getElementById("pubTitle").value = product.title;
         document.getElementById("pubDesc").value = product.description;
         document.getElementById("pubPrice").value = product.price;
@@ -312,7 +346,6 @@
         document.getElementById("pubContact").value = product.contact;
         uploadImages = [...product.images];
         renderImagePreviews();
-        // 修改按钮文字和功能
         let submitBtn = document.getElementById("submitPublish");
         submitBtn.innerText = "保存修改";
         submitBtn.onclick = saveEdit;
@@ -332,11 +365,9 @@
             saveData();
             showToast("修改成功");
         }
-        // 重置发布按钮
         document.getElementById("submitPublish").innerText = "发布 · 支付0.1 π";
         document.getElementById("submitPublish").onclick = () => publishProduct();
         editingProductId = null;
-        // 清空表单
         document.getElementById("pubTitle").value = "";
         document.getElementById("pubDesc").value = "";
         document.getElementById("pubPrice").value = "";
@@ -349,7 +380,6 @@
         renderList();
     }
     
-    // 图片上传
     function setupImageUpload() {
         const fileInput = document.getElementById("imageFileInput");
         document.getElementById("addImageBtn").onclick = () => fileInput.click();
@@ -370,7 +400,6 @@
     }
     window.removeImage = function(idx) { uploadImages.splice(idx,1); renderImagePreviews(); };
     
-    // 我的页面
     function renderMyProducts() {
         let my = products.filter(p => p.sellerWallet === currentUser.walletAddress && p.status === "active");
         let container = document.getElementById("myProductsContainer");
@@ -390,7 +419,6 @@
         if(idx!==-1) { products[idx].status = "sold"; saveData(); renderMyProducts(); renderList(); showToast("已下架"); }
     }
     
-    // 页面切换
     function showPage(pageId) {
         document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
         document.getElementById(pageId).classList.add('active');
@@ -400,11 +428,15 @@
         if(pageId === 'profilePage') renderMyProducts();
     }
     
-    // 初始化
-    window.onload = () => {
+    // 页面启动
+    window.onload = async () => {
         loadData();
         renderList();
         setupImageUpload();
+        // 先进行 Pi 身份验证（自动弹窗）
+        await initPiAndAuthenticate();
+        
+        // 绑定事件
         document.querySelectorAll('.filter-chip').forEach(chip => {
             chip.onclick = () => { document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active')); chip.classList.add('active'); renderList(); };
         });
@@ -416,6 +448,8 @@
         document.getElementById("searchInput").addEventListener("input", renderList);
         document.getElementById("submitPublish").onclick = () => publishProduct();
         document.querySelectorAll('.tab-item').forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
+        
+        // 全局函数挂载
         window.goDetail = goDetail;
         window.copyWallet = copyWallet;
         window.deleteMyProduct = deleteMyProduct;
