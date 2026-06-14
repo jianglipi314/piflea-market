@@ -457,8 +457,17 @@
 /* ============ Supabase Init ============ */
 const SUPABASE_URL = 'https://xiuzymzcjkbhkzffojiw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6Ep5bW6y4ttuyLrd9PLObw_Q7fpvFmS';
-const { createClient } = window.Supabase;
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabase = null;
+(function initSupabase() {
+  try {
+    const sbLib = window.supabase || window.Supabase;
+    if (sbLib && sbLib.createClient) {
+      supabase = sbLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+  } catch (e) {
+    console.error('supabase init error', e);
+  }
+})();
 
 /* ============ Pi SDK ============ */
 const PLATFORM_WALLET = 'A-pi_wallet_for_piflea_market_platform_fee';
@@ -591,6 +600,12 @@ async function loadItems() {
   document.getElementById('listLoader').style.display = 'block';
   document.getElementById('list').innerHTML = '';
   document.getElementById('empty').style.display = 'none';
+  if (!supabase) {
+    document.getElementById('listLoader').style.display = 'none';
+    toast('云端连接中，请稍候...');
+    setTimeout(loadItems, 800);
+    return;
+  }
   try {
     let query = supabase.from('items').select('*');
     if (state.cat !== '全部') query = query.eq('category', state.cat);
@@ -607,15 +622,17 @@ async function loadItems() {
       emoji: CAT_ICON[d.category] || '📦',
       desc: d.description || '', images: d.images || [],
       city: d.city || '', fav: d.fav_count || 0,
-      views: d.views || 0, tpl: d.tpl || '',
+      views: d.views || 0, tpl: (d.tpl !== undefined && d.tpl !== null) ? d.tpl : '',
       createdAt: new Date(d.created_at).getTime()
     }));
     renderHome();
   } catch(e) {
     console.error('loadItems error', e);
-    toast('加载失败，检查网络');
     document.getElementById('listLoader').style.display = 'none';
-    renderHome();
+    const empty = document.getElementById('empty');
+    empty.style.display = 'block';
+    empty.textContent = '云端加载失败，请刷新重试';
+    toast('云端加载失败');
   }
 }
 
