@@ -1,461 +1,1317 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Pi跳蚤市场 · 先锋二手</title>
-    <!-- 引入 Pi SDK (v2) -->
-    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-    <style>
-        /* 样式与之前一致，省略重复代码（实际使用时会保留完整样式） */
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f8f8fc; padding-bottom: 70px; }
-        .status-bar { background: white; padding: 12px 16px 6px; font-size: 14px; font-weight: 500; display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; }
-        .page { display: none; min-height: calc(100vh - 70px); }
-        .page.active { display: block; }
-        .tab-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.96); backdrop-filter: blur(10px); display: flex; justify-content: space-around; padding: 8px 0 16px; border-top: 0.5px solid #e9e9ef; box-shadow: 0 -2px 12px rgba(0,0,0,0.04); z-index: 100; }
-        .tab-item { text-align: center; flex: 1; cursor: pointer; color: #8e8e93; font-size: 10px; transition: color 0.2s; }
-        .tab-item.active { color: #007aff; }
-        .tab-icon { font-size: 24px; margin-bottom: 4px; }
-        .search-section { background: white; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }
-        .search-box { background: #f2f2f6; border-radius: 30px; padding: 10px 16px; display: flex; gap: 8px; margin-bottom: 12px; }
-        .search-box input { flex: 1; border: none; background: transparent; font-size: 16px; outline: none; }
-        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .filter-chip { background: #f2f2f6; padding: 6px 14px; border-radius: 30px; font-size: 14px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
-        .filter-chip.active { background: #007aff; color: white; }
-        .sort-chip { background: #f2f2f6; padding: 6px 14px; border-radius: 30px; font-size: 14px; display: flex; align-items: center; gap: 4px; cursor: pointer; }
-        .product-card { background: white; margin: 12px 16px; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.04); display: flex; cursor: pointer; transition: transform 0.15s; }
-        .product-card:active { transform: scale(0.98); }
-        .product-img { width: 110px; height: 110px; object-fit: cover; background: #e9e9ef; }
-        .product-info { flex: 1; padding: 12px; position: relative; }
-        .product-title { font-weight: 600; font-size: 16px; margin-bottom: 4px; padding-right: 30px; }
-        .product-price { color: #ff3b30; font-weight: 700; font-size: 18px; margin: 8px 0; }
-        .product-price::before { content: "π "; font-size: 14px; }
-        .product-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #8e8e93; }
-        .favorite-icon { position: absolute; right: 12px; top: 12px; font-size: 22px; cursor: pointer; }
-        .swiper-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
-        .swiper-container img { width: 100%; flex-shrink: 0; scroll-snap-align: start; object-fit: cover; height: 350px; background: #e9e9ef; }
-        .detail-info { padding: 20px; }
-        .detail-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
-        .detail-price { font-size: 32px; font-weight: 800; color: #ff3b30; margin: 12px 0; }
-        .seller-card { background: #f8f8fc; border-radius: 16px; padding: 16px; margin: 16px 0; display: flex; align-items: center; gap: 12px; }
-        .seller-avatar { width: 48px; height: 48px; background: #c4c4c4; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-        .other-products { margin: 20px 0; }
-        .other-item { display: flex; align-items: center; gap: 12px; background: white; border-radius: 16px; padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: pointer; }
-        .other-img { width: 50px; height: 50px; object-fit: cover; border-radius: 12px; }
-        .copy-btn, .contact-btn, .edit-btn { background: #007aff; color: white; border: none; width: 100%; padding: 14px; border-radius: 40px; font-weight: 600; font-size: 16px; margin-top: 12px; cursor: pointer; }
-        .contact-btn { background: #34c759; }
-        .edit-btn { background: #ff9f0a; }
-        .form-card { background: white; margin: 16px; border-radius: 24px; padding: 20px; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { font-weight: 500; margin-bottom: 8px; display: block; }
-        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 14px; border: 1px solid #e9e9ef; border-radius: 16px; font-size: 16px; background: #f8f8fc; }
-        .image-preview-list { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-        .image-preview-item { position: relative; width: 80px; height: 80px; }
-        .image-preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
-        .remove-img { position: absolute; top: -8px; right: -8px; background: #ff3b30; color: white; border-radius: 20px; width: 22px; height: 22px; text-align: center; line-height: 20px; font-size: 14px; cursor: pointer; }
-        .add-image-btn { width: 80px; height: 80px; background: #f2f2f6; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 32px; color: #8e8e93; cursor: pointer; }
-        .submit-btn { background: #ff3b30; color: white; width: 100%; padding: 16px; border-radius: 40px; font-weight: 700; font-size: 18px; border: none; margin-top: 20px; }
-        .my-header { background: white; padding: 24px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #f0f0f0; }
-        .my-avatar { width: 64px; height: 64px; background: #007aff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; }
-        .my-product-list { padding: 16px; }
-        .my-item { background: white; border-radius: 20px; padding: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-        .my-item-actions { display: flex; gap: 8px; }
-        .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
-        .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 8px 20px; border-radius: 40px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>π 跳蚤市场 · 先锋二手</title>
+  <!-- ============ Pi SDK (v2) ============ -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<style>
+  :root{
+    --bg:#f4f5f9;
+    --card:#ffffff;
+    --ink:#1b2030;
+    --ink-2:#5a607a;
+    --line:#eceff5;
+    --brand:#ff5533;
+    --brand-2:#ffd23f;
+    --accent:#3e66ff;
+    --ok:#20a480;
+    --warn:#f59e0b;
+    --shadow:0 6px 18px rgba(20,24,40,.06);
+    --radius:14px;
+  }
+  html[data-dark="1"]{
+    --bg:#0f1220; --card:#181c2e; --ink:#eef0fa; --ink-2:#9aa3c5;
+    --line:#262b44; --shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  input,textarea,select{font:inherit;color:inherit}
+  a{color:var(--accent);text-decoration:none}
+
+  /* ======= App Shell ======= */
+  .app{
+    max-width:460px;margin:0 auto;min-height:100vh;position:relative;
+    background:var(--bg);padding-bottom:78px;
+  }
+  .topbar{
+    position:sticky;top:0;z-index:30;background:linear-gradient(180deg,var(--card) 70%,rgba(255,255,255,.55));
+    padding:12px 14px 10px;display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid var(--line);backdrop-filter:saturate(140%) blur(6px);
+  }
+  html[data-dark="1"] .topbar{background:linear-gradient(180deg,var(--card) 70%,rgba(24,28,46,.6))}
+  .logo{
+    width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    color:#fff;font-weight:700;display:grid;place-items:center;box-shadow:var(--shadow);
+  }
+  .top-title{font-weight:700;font-size:16px;letter-spacing:.3px}
+  .top-sub{font-size:12px;color:var(--ink-2);margin-top:-1px}
+  .search{
+    margin-left:auto;background:#f1f3f9;border-radius:999px;padding:8px 12px;
+    display:flex;align-items:center;gap:6px;color:var(--ink-2);font-size:13px;min-width:140px;
+  }
+  .search input{border:0;outline:0;background:transparent;width:120px}
+  .icon-btn{width:34px;height:34px;border-radius:10px;background:var(--line);display:grid;place-items:center;font-size:16px;cursor:pointer}
+  .view{display:none;padding:12px 14px 16px;animation:fadeIn .22s ease}
+  .view.active{display:block}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ======= Home ======= */
+  .banner{
+    margin-top:6px;border-radius:var(--radius);padding:18px 18px 16px;
+    background:linear-gradient(135deg,#ff5533 0%,#ff8f3f 55%,#ffd23f 100%);
+    color:#fff;box-shadow:var(--shadow);position:relative;overflow:hidden;cursor:pointer;
+  }
+  .banner h2{margin:0 0 6px;font-size:20px}
+  .banner p{margin:0;opacity:.92;font-size:13px;line-height:1.5}
+  .banner .coin{
+    position:absolute;right:-10px;top:-14px;font-size:78px;opacity:.22;font-weight:800;
+    transform:rotate(12deg);
+  }
+  .banner .cta{
+    margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);
+    padding:6px 10px;border-radius:999px;font-size:12px;font-weight:600;
+  }
+
+  .quick{
+    margin-top:14px;background:var(--card);border-radius:var(--radius);padding:14px 8px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:10px;box-shadow:var(--shadow);
+  }
+  .quick .q{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);cursor:pointer}
+  .q-icon{
+    width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px;color:#fff;
+    background:#3e66ff;
+  }
+  .q-icon.cat2{background:#20a480}
+  .q-icon.cat3{background:#f59e0b}
+  .q-icon.cat4{background:#8a5cff}
+  .q-icon.cat5{background:#ff5533}
+  .q-icon.cat6{background:#0bb5d9}
+  .q-icon.cat7{background:#ec4899}
+  .q-icon.cat8{background:#64748b}
+
+  .section-title{
+    display:flex;align-items:center;justify-content:space-between;margin:18px 4px 10px;
+  }
+  .section-title h3{margin:0;font-size:16px}
+  .section-title .sub{font-size:12px;color:var(--ink-2);cursor:pointer}
+
+  .recos{
+    display:flex;gap:12px;overflow-x:auto;padding:2px 4px 10px;scroll-snap-type:x mandatory;
+    -ms-overflow-style:none;scrollbar-width:none;
+  }
+  .recos::-webkit-scrollbar{display:none}
+  .reco{
+    flex:0 0 74%;background:var(--card);border-radius:var(--radius);overflow:hidden;
+    box-shadow:var(--shadow);scroll-snap-align:start;position:relative;cursor:pointer;
+  }
+  .reco .img{
+    height:150px;background:linear-gradient(135deg,#eef2ff,#ffe9e2);
+    display:grid;place-items:center;font-size:46px;color:#aab3c7;position:relative;
+  }
+  .reco .img img{width:100%;height:100%;object-fit:cover}
+  .reco .tag{
+    position:absolute;top:8px;left:8px;background:var(--brand);color:#fff;font-size:11px;
+    padding:3px 8px;border-radius:999px;font-weight:600;
+  }
+  .reco .body{padding:10px 12px 12px}
+  .reco .t{font-size:14px;font-weight:600;margin:0 0 4px;
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .reco .p{color:var(--brand);font-weight:700;font-size:16px}
+  .reco .meta{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--ink-2)}
+
+  .cats{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px;-ms-overflow-style:none;scrollbar-width:none}
+  .cats::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;padding:8px 14px;border-radius:999px;background:var(--card);
+    box-shadow:var(--shadow);font-size:13px;color:var(--ink-2);border:1px solid transparent;
+    display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  }
+  .chip.on{color:#fff;background:var(--ink);border-color:var(--ink)}
+  .chip .dot{width:6px;height:6px;border-radius:50%;background:var(--brand)}
+  .chip.on .dot{background:#fff}
+
+  .sortbar{display:flex;gap:8px;margin:0 2px 10px;flex-wrap:wrap}
+  .sortbar .chip{padding:8px 12px;font-size:12px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .card{
+    background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;cursor:pointer;
+  }
+  .card .pic{
+    height:150px;background:linear-gradient(135deg,#f0f3fa,#fef0ea);
+    display:grid;place-items:center;font-size:44px;color:#b8bfd1;position:relative;
+  }
+  .card .pic img{width:100%;height:100%;object-fit:cover}
+  .badge{
+    position:absolute;top:8px;left:8px;background:rgba(255,85,51,.95);color:#fff;
+    font-size:10px;padding:3px 8px;border-radius:999px;font-weight:700;letter-spacing:.4px;
+  }
+  .badge.verify{background:rgba(59,130,246,.95)}
+  .badge.new{background:rgba(32,164,128,.95)}
+  .fav{
+    position:absolute;top:8px;right:8px;background:rgba(255,255,255,.92);
+    width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#b9c0d6;
+    box-shadow:0 2px 6px rgba(0,0,0,.08);font-size:16px;
+  }
+  html[data-dark="1"] .fav{background:#2c3250;color:#cfd5f0}
+  .fav.on{color:var(--brand)}
+  .card .info{padding:10px 10px 12px;display:flex;flex-direction:column;gap:6px}
+  .card .title{
+    font-size:14px;font-weight:600;margin:0;line-height:1.35;min-height:38px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .card .price-row{display:flex;align-items:baseline;justify-content:space-between}
+  .card .price{color:var(--brand);font-weight:800;font-size:16px}
+  .card .price small{font-weight:500;font-size:11px;color:var(--ink-2);margin-left:2px}
+  .card .seller{
+    display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);
+    padding-top:6px;border-top:1px dashed var(--line);
+  }
+  .avatar{
+    width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#3e66ff,#8a5cff);
+    color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;
+  }
+  .fav-count{margin-left:auto;display:inline-flex;align-items:center;gap:3px}
+
+  /* ======= Search ======= */
+  .search-box{background:var(--card);border-radius:999px;padding:10px 14px;display:flex;gap:8px;align-items:center;box-shadow:var(--shadow)}
+  .search-box input{flex:1;border:0;outline:0;background:transparent;color:var(--ink)}
+  .tagcloud{display:flex;flex-wrap:wrap;gap:8px;margin:12px 4px}
+  .tagcloud .t{background:var(--card);color:var(--ink-2);padding:6px 12px;border-radius:999px;font-size:12px;box-shadow:var(--shadow);cursor:pointer}
+
+  /* ======= Publish ======= */
+  .rules{
+    background:linear-gradient(180deg,#fff7ef,#fff);border:1px solid #ffe4c7;
+    color:#8a5a00;border-radius:var(--radius);padding:12px 14px;font-size:13px;line-height:1.7;
+  }
+  html[data-dark="1"] .rules{background:linear-gradient(180deg,#2a1f12,#181c2e);border-color:#554022;color:#ffd98a}
+  .rules b{color:#6b3d00} html[data-dark="1"] .rules b{color:#ffcf70}
+  .fee-box{
+    margin-top:10px;display:flex;align-items:center;justify-content:space-between;
+    background:var(--card);border-radius:12px;padding:10px 12px;border:1px solid var(--line);
+    box-shadow:var(--shadow);
+  }
+  .fee-box .l{font-size:12px;color:var(--ink-2)} .fee-box .r{font-weight:800;color:var(--brand);font-size:16px}
+  .steps{display:flex;align-items:center;gap:6px;margin:12px 4px 4px}
+  .step{flex:1;padding:8px 10px;border-radius:10px;background:var(--card);color:var(--ink-2);text-align:center;font-size:12px;box-shadow:var(--shadow);border:1px solid transparent}
+  .step.on{background:var(--ink);color:#fff}
+  .step.done{background:transparent;color:var(--ok);border-color:var(--ok)}
+  .form{background:var(--card);border-radius:var(--radius);padding:6px 14px;margin-top:12px;box-shadow:var(--shadow)}
+  .row{padding:12px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+  .row:last-child{border-bottom:0}
+  .row label{font-size:12px;color:var(--ink-2);font-weight:600;letter-spacing:.2px}
+  .row input,.row textarea,.row select{
+    width:100%;border:0;outline:0;padding:10px 12px;background:var(--bg);border-radius:10px;color:var(--ink);
+  }
+  .row textarea{min-height:88px;resize:vertical} .row .hint{font-size:12px;color:var(--ink-2)}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .img-uploader{display:flex;flex-wrap:wrap;gap:10px}
+  .thumb{
+    width:78px;height:78px;border-radius:10px;background:var(--bg);overflow:hidden;
+    display:grid;place-items:center;color:#aab3c7;font-size:22px;position:relative;cursor:pointer;
+  }
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb .x{
+    position:absolute;top:-6px;right:-6px;background:#fff;color:#444;border-radius:50%;
+    width:20px;height:20px;display:grid;place-items:center;font-size:13px;box-shadow:var(--shadow);
+  }
+  .actions{display:flex;gap:10px;margin-top:14px}
+  .btn{
+    flex:1;padding:14px;border-radius:12px;font-weight:700;text-align:center;font-size:15px;
+    transition:transform .05s ease,opacity .15s ease;background:transparent;color:inherit;border:none;cursor:pointer;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(135deg,var(--brand),#ff8f3f);color:#fff;box-shadow:0 10px 20px rgba(255,85,51,.22)}
+  .btn.ghost{background:var(--card);color:var(--ink-2);border:1px solid var(--line);box-shadow:var(--shadow)}
+  .btn[disabled]{opacity:.6;cursor:not-allowed}
+  .preview-wrap{background:var(--card);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow)}
+  .preview-wrap h4{margin:0 0 10px;font-size:14px}
+
+  /* ======= Detail ======= */
+  .hero{
+    height:280px;background:linear-gradient(135deg,#f0f3fa,#fef0ea);border-radius:0 0 18px 18px;
+    display:grid;place-items:center;font-size:90px;color:#b8bfd1;margin:-12px -14px 0;position:relative;overflow:hidden;cursor:pointer;
+  }
+  .hero img{width:100%;height:100%;object-fit:cover}
+  .hero .back,.hero .share{position:absolute;top:14px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;box-shadow:var(--shadow);background:rgba(255,255,255,.92);color:#333;cursor:pointer}
+  .hero .back{left:14px} .hero .share{right:14px}
+  html[data-dark="1"] .hero .back,html[data-dark="1"] .hero .share{background:#2c3250;color:#eef0fa}
+  .gallery-dots{position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:center;gap:6px}
+  .gallery-dots span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.6)}
+  .gallery-dots span.on{width:18px;border-radius:3px;background:#fff}
+  .detail-card{background:var(--card);border-radius:var(--radius);padding:14px;margin-top:-20px;position:relative;box-shadow:var(--shadow)}
+  .detail-card .title{font-size:18px;font-weight:700;margin:0 0 6px}
+  .detail-card .price{color:var(--brand);font-size:22px;font-weight:800}
+  .meta-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+  .meta-row span{background:var(--bg);padding:4px 8px;border-radius:999px}
+  .seller-row{
+    display:flex;align-items:center;gap:10px;margin-top:14px;padding:12px;border-radius:12px;background:var(--bg);
+  }
+  .seller-row .avatar{width:36px;height:36px;font-size:14px}
+  .seller-row .name{font-weight:600}
+  .seller-row .sub{font-size:12px;color:var(--ink-2)}
+  .seller-row .right{margin-left:auto;font-size:12px;color:var(--ink-2)}
+  .desc{
+    background:var(--card);border-radius:var(--radius);padding:14px;margin-top:12px;
+    box-shadow:var(--shadow);line-height:1.7;color:var(--ink);white-space:pre-wrap;font-size:14px;
+  }
+  .action-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .action-row .btn{flex:0 0 auto;padding:10px 14px;font-size:13px}
+  .qrcard{background:var(--card);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px}
+  .qrcard canvas{background:#fff;border-radius:8px}
+  .qrcard .txt{font-size:12px;color:var(--ink-2);line-height:1.6}
+  .qrcard .txt b{color:var(--ink);font-size:14px}
+  .detail-fab{
+    position:fixed;left:0;right:0;bottom:0;max-width:460px;margin:0 auto;
+    background:var(--card);border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;
+    align-items:center;z-index:40;
+  }
+  .detail-fab .btn{flex:1;padding:14px}
+
+  /* ======= Mine ======= */
+  .profile{
+    background:linear-gradient(135deg,#1f2937,#374151);color:#fff;border-radius:var(--radius);
+    padding:16px;display:flex;gap:12px;align-items:center;box-shadow:var(--shadow);
+  }
+  .profile .avatar{width:54px;height:54px;font-size:20px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#1b1b1b}
+  .profile .name{font-size:16px;font-weight:700}
+  .profile .id{font-size:12px;opacity:.75;margin-top:2px}
+  .profile .edit{margin-left:auto;font-size:12px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:999px;cursor:pointer;color:#fff;border:none}
+
+  .wallet{
+    margin-top:12px;background:var(--card);border-radius:var(--radius);padding:12px 14px;
+    display:grid;grid-template-columns:1fr 1fr 1fr 1fr;box-shadow:var(--shadow);
+  }
+  .wallet .cell{text-align:center;padding:4px 0;border-right:1px solid var(--line)}
+  .wallet .cell:last-child{border-right:0}
+  .wallet .n{font-size:18px;font-weight:800;color:var(--ink)}
+  .wallet .l{font-size:12px;color:var(--ink-2);margin-top:2px}
+
+  .tabs{display:flex;gap:6px;margin:12px 0 6px}
+  .tab{flex:1;padding:10px;border-radius:12px;background:var(--card);font-size:13px;color:var(--ink-2);
+    box-shadow:var(--shadow);text-align:center;font-weight:600;border:1px solid transparent;cursor:pointer}
+  .tab.on{background:var(--ink);color:#fff}
+  .list{display:flex;flex-direction:column;gap:10px}
+  .list .row-item{
+    background:var(--card);border-radius:var(--radius);padding:10px;display:flex;gap:12px;
+    box-shadow:var(--shadow);align-items:center;cursor:pointer;
+  }
+  .list .row-item .pic{width:88px;height:88px;border-radius:12px;background:var(--bg);display:grid;place-items:center;font-size:34px;color:#b8bfd1;flex:0 0 auto;overflow:hidden}
+  .list .row-item .pic img{width:100%;height:100%;object-fit:cover}
+  .list .row-item .txt{flex:1;min-width:0}
+  .list .row-item h4{margin:0 0 4px;font-size:14px;font-weight:600;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .list .row-item .price{color:var(--brand);font-weight:800}
+  .list .row-item .sub{font-size:12px;color:var(--ink-2);margin-top:4px}
+  .list .row-item .rm{color:#b91c1c;font-size:12px;background:transparent;border:1px solid #fecaca;padding:6px 10px;border-radius:999px;margin-left:8px;cursor:pointer}
+  html[data-dark="1"] .list .row-item .rm{color:#fca5a5;border-color:#4a2a2a}
+  .list .row-item .mini{font-size:12px;color:var(--ok)}
+  .empty{text-align:center;color:var(--ink-2);padding:30px 0;font-size:13px}
+
+  .setting{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-top:12px;padding:0 14px}
+  .setting .srow{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .setting .srow:last-child{border-bottom:0}
+  .setting .srow .lb{flex:1} .setting .srow .val{color:var(--ink-2);font-size:13px;word-break:break-all}
+  .toggle{width:40px;height:22px;border-radius:999px;background:#d8dce8;position:relative;transition:.2s;cursor:pointer}
+  .toggle.on{background:var(--brand)}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+  .toggle.on::after{left:20px}
+
+  /* ======= Toast ======= */
+  .toast{
+    position:fixed;left:50%;top:26px;transform:translate(-50%,-20px);
+    background:#1b2030;color:#fff;padding:10px 14px;border-radius:999px;font-size:13px;
+    opacity:0;transition:all .25s ease;z-index:80;pointer-events:none;max-width:80%;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ======= Bottom Nav ======= */
+  .nav{
+    position:fixed;left:0;right:0;bottom:0;max-width:460px;margin:0 auto;background:rgba(255,255,255,.96);
+    backdrop-filter:saturate(140%) blur(10px);border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(5,1fr);z-index:50;
+  }
+  html[data-dark="1"] .nav{background:rgba(24,28,46,.94);border-top-color:#262b44}
+  .nav button{
+    padding:8px 0 12px;display:flex;flex-direction:column;align-items:center;gap:2px;
+    color:var(--ink-2);font-size:11px;background:none;border:none;cursor:pointer;
+  }
+  .nav button .ic{font-size:18px;line-height:1}
+  .nav button.on{color:var(--brand)}
+  .nav .publish{position:relative;margin-top:-18px}
+  .nav .publish .ic{
+    width:44px;height:44px;border-radius:50%;
+    background:linear-gradient(135deg,var(--brand),#ff8f3f);color:#fff;display:grid;place-items:center;
+    font-size:20px;box-shadow:0 10px 20px rgba(255,85,51,.3);margin-top:-14px;
+  }
+
+  .sheet-mask{position:fixed;inset:0;background:rgba(10,12,28,.45);display:none;align-items:flex-end;justify-content:center;z-index:70}
+  .sheet-mask.on{display:flex;animation:fadeIn .2s ease}
+  .sheet{width:100%;max-width:460px;background:var(--card);border-radius:20px 20px 0 0;padding:16px;max-height:80vh;overflow:auto;box-shadow:0 -20px 60px rgba(0,0,0,.25);animation:slideUp .25s ease}
+  @keyframes slideUp{from{transform:translateY(20px);opacity:.6}to{transform:none;opacity:1}}
+  .sheet h3{margin:0 0 8px}
+  .sheet .grid-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .stat{background:var(--card);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)}
+  .stat .n{font-size:22px;font-weight:800;color:var(--brand)}
+  .stat .l{font-size:12px;color:var(--ink-2);margin-top:4px}
+
+  /* ======= Pi Auth banner ======= */
+  .pi-auth{
+    background:linear-gradient(135deg,#3e66ff,#8a5cff);color:#fff;border-radius:var(--radius);
+    padding:12px 14px;margin-bottom:12px;font-size:13px;box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:10px;
+  }
+  .pi-auth .ico{font-size:22px}
+  .pi-auth .btn-sm{background:rgba(255,255,255,.2);color:#fff;border:none;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto}
+</style>
 </head>
 <body>
-<div class="status-bar"><span>9:41</span><span>📶 🔋 100%</span></div>
+<div class="app">
 
-<div id="listPage" class="page active">
-    <div class="search-section">
-        <div class="search-box"><span>🔍</span><input type="text" id="searchInput" placeholder="搜索商品..."></div>
-        <div class="filter-row">
-            <div class="filter-chip" data-cat="all">全部</div>
-            <div class="filter-chip" data-cat="手机数码">📱 数码</div>
-            <div class="filter-chip" data-cat="家居生活">🏠 家居</div>
-            <div class="filter-chip" data-cat="图书音像">📚 图书</div>
-            <div class="sort-chip" id="sortBtn">💰 价格 ↑</div>
+  <div class="topbar">
+    <div class="logo">π</div>
+    <div>
+      <div class="top-title" id="topTitle">π 跳蚤市场</div>
+      <div class="top-sub" id="topSub">先锋二手 · 本地存储</div>
+    </div>
+    <div class="search" onclick="goto('search')"><span>🔍</span><span>搜索商品</span></div>
+    <button class="icon-btn" onclick="toggleDark()" id="darkBtn" title="切换主题">🌙</button>
+  </div>
+
+  <!-- ============ Home ============ -->
+  <section class="view active" id="view-home">
+    <div class="banner" onclick="goto('publish')">
+      <h2>零门槛卖闲置 · 用 π 秒级到账</h2>
+      <p>发布费仅 <b>0.1 π</b>，平台担保交易 · 在 Pi Browser 中可真实支付</p>
+      <span class="coin">π</span>
+      <button class="cta">立即发布 →</button>
+    </div>
+
+    <div class="section-title"><h3>今日推荐</h3><span class="sub" id="recoCount"></span></div>
+    <div class="recos" id="recos"></div>
+
+    <div class="section-title"><h3>分类浏览</h3><span class="sub" id="catTip">全部</span></div>
+    <div class="cats" id="cats"></div>
+
+    <div class="sortbar" id="sortbar"></div>
+    <div class="section-title"><h3 id="listTitle">最新发布</h3><button class="sub" id="toggleReco" onclick="toggleReco()">只看推荐</button></div>
+    <div class="grid" id="list"></div>
+    <div class="empty" id="empty" style="display:none">暂无商品，去发一个试试～</div>
+  </section>
+
+  <!-- ============ Search ============ -->
+  <section class="view" id="view-search">
+    <div class="search-box">
+      <span>🔍</span>
+      <input id="qInput" placeholder="搜索：iPhone、边几、绘本…" oninput="onSearch()"/>
+      <button onclick="document.getElementById('qInput').value='';onSearch()" style="font-size:14px;color:var(--ink-2);background:none;border:none;cursor:pointer">清除</button>
+    </div>
+    <div class="tagcloud" id="tagcloud"></div>
+    <div class="grid" id="searchList"></div>
+    <div class="empty" id="searchEmpty" style="display:none">没有匹配的商品，换个关键词试试～</div>
+  </section>
+
+  <!-- ============ Publish ============ -->
+  <section class="view" id="view-publish">
+    <div class="pi-auth" id="piAuthBox" style="display:none">
+      <span class="ico">🔑</span>
+      <div><b id="piAuthText">尚未连接 Pi 账户</b><div style="font-size:12px;opacity:.85;margin-top:2px">认证后可真实支付 0.1 π 发布费</div></div>
+      <button class="btn-sm" onclick="initPiAndAuthenticate(true)" id="piAuthBtn">连接</button>
+    </div>
+
+    <div class="steps" id="steps">
+      <div class="step on" data-step="1">① 填写</div>
+      <div class="step" data-step="2">② 预览</div>
+      <div class="step" data-step="3">③ 完成</div>
+    </div>
+    <div class="rules">
+      <b>📌 上架规则</b><br/>
+      · 发布前缴纳 <b>0.1 π</b> 发布费（Pi Browser 中走真实支付，其他环境为模拟）<br/>
+      · 禁止发布违禁品、虚假商品；<br/>
+      · 真实交易请走 Pi 钱包担保转账，平台不承担私下交易风险。
+    </div>
+    <div class="fee-box">
+      <div class="l">平台发布费</div>
+      <div class="r">0.1 π</div>
+    </div>
+
+    <form class="form" id="publishForm" onsubmit="return doPublish(event)">
+      <div class="row">
+        <label>商品标题</label>
+        <input id="f-title" placeholder="例如：九成新 iPhone 13 128G 黑色" required maxlength="40"/>
+        <div class="hint">40 字以内，突出成色 / 型号 / 颜色</div>
+      </div>
+      <div class="row"><label>分类</label>
+        <select id="f-cat">
+          <option>数码</option><option>生活</option><option>美妆</option>
+          <option>图书</option><option>服饰</option><option>母婴</option><option>运动</option>
+        </select>
+      </div>
+      <div class="two-col" style="margin-top:6px">
+        <div class="row"><label>价格（π）</label><input id="f-price" type="number" step="0.01" min="0.01" placeholder="2.5" required/></div>
+        <div class="row"><label>所在城市</label><input id="f-city" placeholder="北京 · 海淀" maxlength="20"/></div>
+      </div>
+      <div class="row"><label>商品描述</label><textarea id="f-desc" placeholder="买了多久、是否带包装、是否有瑕疵、可面交地点..." required></textarea></div>
+      <div class="row"><label>图片（最多 6 张，本地上传）</label>
+        <div class="img-uploader" id="uploader">
+          <button type="button" class="thumb" onclick="document.getElementById('f-files').click()">＋</button>
         </div>
+        <input id="f-files" type="file" accept="image/*" multiple style="display:none" onchange="onFiles(event)"/>
+        <div class="hint">Demo 中仅在浏览器本地展示，不会上传到服务器</div>
+      </div>
+      <div class="two-col" style="margin-top:6px">
+        <div class="row"><label>卖家昵称</label><input id="f-seller" placeholder="你的昵称" required maxlength="16"/></div>
+        <div class="row"><label>联系方式（微信/Telegram）</label><input id="f-contact" placeholder="站内信 / 邮箱（可选）" maxlength="30"/></div>
+      </div>
+      <div class="preview-wrap" id="preview" style="display:none">
+        <h4>📋 发布预览</h4><div id="previewBody"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn ghost" onclick="clearForm()">清空</button>
+        <button type="button" class="btn ghost" id="btnPreview" onclick="togglePreview()">预览</button>
+        <button type="submit" class="btn primary" id="f-submit">发布 · 支付 0.1 π</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ============ Detail ============ -->
+  <section class="view" id="view-detail">
+    <div class="hero" id="d-hero">
+      <button class="back" onclick="goto('home')">‹</button>
+      <button class="share" onclick="openSheet('share')">⇪</button>
+      <span id="d-emoji">📦</span>
+      <div class="gallery-dots" id="d-dots"></div>
     </div>
-    <div id="productListContainer"></div>
-</div>
-
-<div id="detailPage" class="page">
-    <div style="padding: 12px 16px 0;"><button onclick="showPage('listPage')" style="background:none; border:none; font-size:28px;">←</button></div>
-    <div id="detailContent"></div>
-</div>
-
-<div id="publishPage" class="page">
-    <div class="form-card">
-        <h2 style="margin-bottom: 16px;">✨ 发布闲置</h2>
-        <div class="form-group"><input type="text" id="pubTitle" placeholder="标题 *"></div>
-        <div class="form-group"><textarea id="pubDesc" rows="3" placeholder="描述 *"></textarea></div>
-        <div class="form-group"><input type="number" id="pubPrice" step="0.1" placeholder="价格 (π) *"></div>
-        <div class="form-group"><select id="pubCategory"><option>手机数码</option><option>家居生活</option><option>图书音像</option><option>服饰鞋包</option><option>其他</option></select></div>
-        <div class="form-group"><input type="text" id="pubCity" placeholder="城市 *"></div>
-        <div class="form-group"><input type="text" id="pubContact" placeholder="联系方式 (微信/Telegram) *"></div>
-        <div class="form-group">
-            <label>图片</label>
-            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                <div class="add-image-btn" id="addImageBtn">+</div>
-                <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none">
-                <div id="imagePreviewList" class="image-preview-list"></div>
-            </div>
+    <div class="detail-card">
+      <h2 class="title" id="d-title">—</h2>
+      <div class="price"><span id="d-price">0</span> <small style="font-weight:500">π</small></div>
+      <div class="meta-row" id="d-meta"></div>
+      <div class="seller-row">
+        <div class="avatar" id="d-avatar">?</div>
+        <div class="t" style="flex:1;min-width:0">
+          <div class="name" id="d-seller">—</div>
+          <div class="sub" id="d-seller-sub">平台认证卖家</div>
         </div>
-        <button class="submit-btn" id="submitPublish">发布 · 支付0.1 π</button>
+        <div class="right" id="d-loc">—</div>
+      </div>
     </div>
+    <div class="desc" id="d-desc">—</div>
+    <div class="action-row">
+      <button class="btn ghost" onclick="openDetailChat()">💬 联系卖家</button>
+      <button class="btn ghost" onclick="openSheet('share')">⇪ 分享</button>
+      <button class="btn ghost" onclick="copySellerWallet()">📋 复制卖家钱包</button>
+    </div>
+    <div class="qrcard"><canvas id="qrCanvas" width="96" height="96" style="width:96px;height:96px"></canvas>
+      <div class="txt"><b>扫码查看商品</b><br/>本地 Demo 二维码：按商品 id 生成可识别图案</div>
+    </div>
+    <div class="detail-fab" id="d-fab">
+      <button class="btn ghost" id="d-fav-btn" onclick="toggleFavCurrent()">⭐ 收藏</button>
+      <button class="btn primary" onclick="fakeBuy()">立即购买</button>
+    </div>
+  </section>
+
+  <!-- ============ Chats ============ -->
+  <section class="view" id="view-chats">
+    <div class="section-title"><h3>消息中心</h3><span class="sub" id="chatCount"></span></div>
+    <div class="chat-list" id="chatList"></div>
+    <div class="empty" id="chatEmpty">还没有消息，点进商品页联系卖家试试～</div>
+  </section>
+
+  <section class="view" id="view-chat">
+    <div class="chat-head" style="background:var(--card);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);margin-bottom:10px;display:flex;align-items:center;gap:10px">
+      <button class="back" onclick="goto('chats')" style="width:34px;height:34px;border-radius:10px;background:var(--line);display:grid;place-items:center;margin-right:4px;border:none;cursor:pointer">‹</button>
+      <div class="avatar" id="chat-avatar" style="width:36px;height:36px;font-size:14px">?</div>
+      <div class="t" style="flex:1;min-width:0">
+        <div class="name" id="chat-name" style="font-weight:700;font-size:15px">—</div>
+        <div class="sub" id="chat-sub" style="font-size:12px;color:var(--ink-2)">关于某件闲置</div>
+      </div>
+    </div>
+    <div class="msg-area" id="msgArea" style="min-height:58vh;display:flex;flex-direction:column;gap:8px;padding:6px 4px 12px"></div>
+    <div style="position:sticky;bottom:0;background:var(--card);border-radius:999px;padding:8px 8px 8px 14px;display:flex;gap:8px;align-items:center;box-shadow:var(--shadow);margin-top:10px">
+      <input id="chatInput" placeholder="发送消息给卖家..." style="flex:1;border:0;outline:0;background:transparent;color:var(--ink)" onkeydown="if(event.key==='Enter')sendMsg()"/>
+      <button class="send" onclick="sendMsg()" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--brand),#ff8f3f);color:#fff;display:grid;place-items:center;font-weight:800;border:none;cursor:pointer">→</button>
+    </div>
+  </section>
+
+  <!-- ============ Mine ============ -->
+  <section class="view" id="view-mine">
+    <div class="profile">
+      <div class="avatar" id="m-avatar">我</div>
+      <div>
+        <div class="name" id="m-name">本地用户</div>
+        <div class="id" id="m-id">未认证 · 本地模式</div>
+      </div>
+      <button class="edit" onclick="initPiAndAuthenticate(true)">连接 Pi</button>
+    </div>
+    <div class="wallet">
+      <div class="cell"><div class="n" id="m-post">0</div><div class="l">我的发布</div></div>
+      <div class="cell"><div class="n" id="m-fav">0</div><div class="l">我的收藏</div></div>
+      <div class="cell"><div class="n" id="m-pi">100.0</div><div class="l">钱包 π (Demo)</div></div>
+      <div class="cell"><div class="n" id="m-view">0</div><div class="l">总浏览</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" id="tab-post" onclick="switchMine('post')">我的发布</button>
+      <button class="tab" id="tab-fav" onclick="switchMine('fav')">我的收藏</button>
+      <button class="tab" id="tab-hist" onclick="switchMine('hist')">浏览记录</button>
+    </div>
+    <div class="list" id="mine-list"></div>
+    <div class="empty" id="mine-empty">空空如也～</div>
+    <div class="setting">
+      <div class="srow"><div class="lb">📍 默认位置</div><div class="val" id="s-city">未设置</div></div>
+      <div class="srow"><div class="lb">💳 Pi 钱包地址</div><div class="val" id="s-piwallet" style="font-family:monospace;font-size:11px">未连接</div></div>
+      <div class="srow"><div class="lb">🌙 深色模式</div><div class="toggle" id="darkToggle" onclick="toggleDark()"></div></div>
+      <div class="srow"><div class="lb">🔔 通知</div><div class="toggle on" onclick="this.classList.toggle('on');toast('已切换通知（Demo）')"></div></div>
+      <div class="srow"><button class="btn ghost" onclick="exportData()">导出本地数据</button></div>
+      <div class="srow"><button class="btn ghost" onclick="resetData()">重置 Demo 数据</button></div>
+    </div>
+    <div class="setting" id="adminBox" style="display:none">
+      <div class="srow"><div class="lb"><b>🧑‍💼 运营面板</b></div><div class="val">本地</div></div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n" id="st-items">0</div><div class="l">商品数</div></div>
+        <div class="stat"><div class="n" id="st-fav">0</div><div class="l">收藏数</div></div>
+        <div class="stat"><div class="n" id="st-view">0</div><div class="l">总浏览</div></div>
+        <div class="stat"><div class="n" id="st-chat">0</div><div class="l">对话数</div></div>
+      </div>
+      <div class="srow"><button class="btn primary" onclick="toggleAdminBoost()">一键增加推荐度</button></div>
+      <div class="srow"><button class="btn ghost" onclick="goto('admin')">进入管理页</button></div>
+    </div>
+    <div class="empty" style="padding:18px 0 0;cursor:pointer" onclick="toggleAdmin()"><span id="adminToggleHint">· 点击开启运营面板（5 次） ·</span></div>
+  </section>
+
+  <!-- ============ Admin ============ -->
+  <section class="view" id="view-admin">
+    <div class="section-title"><h3>运营后台</h3><span class="sub" onclick="goto('mine')">返回 ›</span></div>
+    <div class="stat-grid">
+      <div class="stat"><div class="n" id="a-items">0</div><div class="l">商品数</div></div>
+      <div class="stat"><div class="n" id="a-fav">0</div><div class="l">收藏数</div></div>
+      <div class="stat"><div class="n" id="a-view">0</div><div class="l">总浏览</div></div>
+      <div class="stat"><div class="n" id="a-chat">0</div><div class="l">对话数</div></div>
+    </div>
+    <div class="section-title"><h3>全部商品</h3><span class="sub">可切换推荐</span></div>
+    <div class="list" id="adminList"></div>
+    <div class="empty" style="padding:18px 0 60px">— end —</div>
+  </section>
+
+  <nav class="nav" id="nav">
+    <button data-v="home" class="on"><span class="ic">🏠</span><span>首页</span></button>
+    <button data-v="search"><span class="ic">🔍</span><span>搜索</span></button>
+    <button class="publish" onclick="goto('publish')"><span class="ic">＋</span><span>发布</span></button>
+    <button data-v="chats"><span class="ic">💬</span><span>消息</span></button>
+    <button data-v="mine"><span class="ic">👤</span><span>我的</span></button>
+  </nav>
 </div>
 
-<div id="profilePage" class="page">
-    <div class="my-header">
-        <div class="my-avatar">👤</div>
-        <div><strong id="userNickname">Pi先锋</strong><br><span style="font-size:12px; color:#8e8e93;" id="userStatus">未认证</span></div>
-    </div>
-    <div class="my-product-list">
-        <h3 style="margin-bottom: 12px;">📦 我的发布</h3>
-        <div id="myProductsContainer"></div>
-    </div>
+<div class="sheet-mask" id="sheet">
+  <div class="sheet">
+    <h3 id="sheetTitle">标题</h3>
+    <div id="sheetBody" style="font-size:14px;color:var(--ink-2);line-height:1.7"></div>
+    <div class="grid-actions" id="sheetActions"></div>
+    <div class="actions"><button class="btn ghost" onclick="closeSheet()">关闭</button></div>
+  </div>
 </div>
 
-<div class="tab-bar">
-    <div class="tab-item active" data-page="listPage"><div class="tab-icon">🏠</div><div>首页</div></div>
-    <div class="tab-item" data-page="publishPage"><div class="tab-icon">📤</div><div>发布</div></div>
-    <div class="tab-item" data-page="profilePage"><div class="tab-icon">👤</div><div>我的</div></div>
-</div>
-<div id="toast" class="toast">提示</div>
+<div class="toast" id="toast"></div>
 
 <script>
-    // ================== 配置 ==================
-    // ⚠️ 重要：将下面 PLATFORM_WALLET 改为你自己的 Pi 钱包公钥地址（用于接收发布费0.1 Pi）
-    const PLATFORM_WALLET = "GA7QYNF7SOWQ3GLR2BGMZEH3UM4I6Y2VQY2K5Q3M3K7X6X5H5X4X3W2X1"; // 请替换为真实钱包地址
-    const ENABLE_REAL_PI_PAYMENT = true;   // 开启真实支付（需在 Pi Browser 中生效）
-    
-    // 全局用户对象（将从 Pi SDK 填充）
-    let currentUser = {
-        nickname: "访客",
-        walletAddress: "",
-        contact: ""
+/* ============ Pi SDK 配置 ============ */
+// 将下面 PLATFORM_WALLET 改为你自己的 Pi 钱包公钥地址（用于接收发布费 0.1 π）
+const PLATFORM_WALLET = "GA7QYNF7SOWQ3GLR2BGMZEH3UM4I6Y2VQY2K5Q3M3K7X6X5H5X4X3W2X1";
+const ENABLE_REAL_PI_PAYMENT = true;  // 开启真实支付（在 Pi Browser 中生效）
+
+// 全局用户对象（从 Pi SDK 填充）
+let currentUser = {
+  nickname: "本地用户",
+  walletAddress: "",
+  contact: ""
+};
+let piSDKReady = false;
+let isAuthenticated = false;
+
+/* ============ Pi SDK 身份验证 ============ */
+async function initPiAndAuthenticate(force){
+  const authBox = document.getElementById('piAuthBox');
+  const authText = document.getElementById('piAuthText');
+  const authBtn = document.getElementById('piAuthBtn');
+
+  if (typeof window.Pi === 'undefined'){
+    console.warn("Not in Pi Browser, using mock mode.");
+    if(authBox){ authBox.style.display='flex'; authText.textContent='当前非 Pi Browser，使用模拟模式'; if(authBtn){ authBtn.textContent='模拟登录'; } }
+    currentUser = { nickname:"演示用户", walletAddress:"GA7DEMO...LOCAL", contact:"demo@pi" };
+    isAuthenticated = false; piSDKReady = false;
+    updateUserUI(); return;
+  }
+
+  try{
+    await window.Pi.init({ version:"2.0", sandbox:false });
+    piSDKReady = true;
+    const auth = await window.Pi.authenticate(['username','wallet_address']);
+    if(auth && auth.username){
+      currentUser.nickname = auth.username;
+      currentUser.walletAddress = auth.wallet_address || "";
+      currentUser.contact = `pi://user/${auth.username}`;
+      isAuthenticated = true;
+      if(authBox){ authBox.style.display='flex'; authText.textContent='已连接 Pi 账户 ' + auth.username; if(authBtn){ authBtn.textContent='已连接'; authBtn.disabled=true; } }
+      toast('✅ Pi 账户已连接');
+    } else { throw new Error("Authentication failed"); }
+  } catch(err){
+    console.error("Pi SDK init or auth error:", err);
+    if(force){ toast('认证失败或被取消，仍可使用模拟模式'); }
+    currentUser = { nickname:"演示用户", walletAddress:"GA7DEMO...", contact:"demo@pi" };
+    isAuthenticated = false;
+    if(authBox){ authBox.style.display='flex'; authText.textContent='认证失败 · 使用模拟模式'; }
+  }
+  updateUserUI();
+}
+
+function updateUserUI(){
+  const nameEl = document.getElementById('m-name');
+  const idEl = document.getElementById('m-id');
+  const avatarEl = document.getElementById('m-avatar');
+  const walletEl = document.getElementById('s-piwallet');
+  if(nameEl) nameEl.textContent = currentUser.nickname || "本地用户";
+  if(idEl){
+    if(isAuthenticated) idEl.textContent = '已认证 · Pi 先锋';
+    else if(currentUser.walletAddress) idEl.textContent = '演示模式 · ' + currentUser.nickname;
+    else idEl.textContent = '未认证 · 本地模式';
+  }
+  if(avatarEl) avatarEl.textContent = (currentUser.nickname||'我').slice(0,1).toUpperCase();
+  if(walletEl) walletEl.textContent = currentUser.walletAddress || "未连接";
+  renderMine();
+}
+
+/* ============ State ============ */
+const STORE_KEY = 'pi_flea_fused_v1';
+const CATS = ['全部','数码','生活','美妆','图书','服饰','母婴','运动'];
+const CAT_ICON = { '数码':'📱','生活':'🏠','美妆':'💄','图书':'📚','服饰':'👕','母婴':'🍼','运动':'⚽','全部':'🔥' };
+const HOT_TAGS = ['iPhone','Switch','宜家','Kindle','双肩包','AirPods','绘本','相机','滑板','美妆蛋'];
+const SEED = [
+  {title:'九成新 iPhone 13 128G 黑色 · 带原装充电器', price:2.5, cat:'数码', emoji:'📱',
+   desc:'购于官方店，使用 1 年半，外观无磕碰，电池健康 92%。支持当面验货，北京海淀可面交。',
+   fav:128, seller:'小周', city:'北京 · 海淀', tpl:'reco', views:342},
+  {title:'IKEA 白色小边几 · 自提优先', price:0.6, cat:'生活', emoji:'🛋',
+   desc:'搬家用不到，组装完整，无损坏。尺寸 55×45×55cm。', fav:34, seller:'阿 May', city:'上海 · 静安', tpl:'reco', views:188},
+  {title:'Kindle Paperwhite 4 · 8G', price:1.2, cat:'图书', emoji:'📖',
+   desc:'屏幕无划痕，带原装皮套。已重置，即买即用。', fav:56, seller:'书生', city:'南京', views:220},
+  {title:'全新未拆 AirPods Pro 2 USB-C', price:3.8, cat:'数码', emoji:'🎧',
+   desc:'抽奖获得，包装完整，未拆封。接受验货。', fav:210, seller:'数码控', city:'广州', tpl:'reco', views:512},
+  {title:'儿童绘本 20 本打包', price:0.8, cat:'母婴', emoji:'📚',
+   desc:'3-6 岁绘本，成色新，无涂画。可单卖，打包更优惠。', fav:41, seller:'宝妈', city:'成都', views:160},
+  {title:'迪卡侬 20L 双肩包 · 九成新', price:0.5, cat:'运动', emoji:'🎒',
+   desc:'买后只用过 2 次，防水面料。原价约 150。', fav:22, seller:'户外党', city:'杭州', views:140},
+  {title:'任天堂 Switch OLED 白色主机', price:4.2, cat:'数码', emoji:'🎮',
+   desc:'2023 款，自用，原装配件齐全。可线下验机。', fav:180, seller:'阿楠', city:'深圳', tpl:'reco', views:480},
+  {title:'优衣库 U 系列短袖 M 码', price:0.3, cat:'服饰', emoji:'👕',
+   desc:'只穿过一次。原价 99，尺码不合适转出。', fav:15, seller:'糖糖', city:'武汉', views:95},
+];
+
+function freshState(){
+  const now = Date.now();
+  return {
+    items: SEED.map((d,i)=>({
+      id:'d'+(i+1), title:d.title, price:d.price, cat:d.cat, seller:d.seller,
+      emoji:d.emoji, desc:d.desc, fav:d.fav||0, tpl:d.tpl||'',
+      createdAt: now - (i+1)*3600*1000, images:[], owner:'demo',
+      city:d.city||'', views: d.views||0,
+      contact: d.contact || '', sellerWallet: d.sellerWallet || '',
+    })),
+    favs: [], cat: '全部', onlyReco: false, sort: 'new',
+    currentDetailId: null, mineTab: 'post', history: [],
+    chats: {}, wallet: 100, city: '', dark: 0, admin: 0, adminClicks: 0,
+  };
+}
+
+const state = load() || freshState();
+
+/* ============ Persistence ============ */
+function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)||'') || null; }catch(e){ return null; } }
+function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){} }
+
+/* ============ Toast / Sheet ============ */
+let toastTimer=null;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), 1800);
+}
+function openSheet(kind){
+  const box=document.getElementById('sheet');
+  const title=document.getElementById('sheetTitle');
+  const body=document.getElementById('sheetBody');
+  const acts=document.getElementById('sheetActions');
+  acts.innerHTML='';
+  if(kind==='menu'){
+    title.textContent='菜单';
+    body.innerHTML='欢迎来到 π 跳蚤市场！你可以：<br/>· 🔍 在搜索页按标题/分类/描述筛选；<br/>· 📝 发布你的闲置并预览，可走真实 Pi 支付；<br/>· 💬 与卖家对话（本地模拟）；<br/>· 👤 在「我的」查看发布、收藏、浏览记录；<br/>· 🌙 切换浅色 / 深色主题；<br/>· ⇪ 每个商品都有分享 / 举报 / 二维码 Demo。';
+    acts.innerHTML=`<button class="btn ghost" onclick="closeSheet();goto('search')">去搜索</button><button class="btn primary" onclick="closeSheet();goto('publish')">发闲置</button>`;
+  }else if(kind==='share'){
+    const it = state.items.find(x=>x.id===state.currentDetailId);
+    title.textContent='分享商品';
+    body.innerHTML = it ? (`链接：<code style="background:var(--line);padding:2px 6px;border-radius:4px">pi-market://item/${it.id}</code><br/>可复制到剪贴板（Demo 会做 toast 提示），详情页也提供伪 QR 图形。`) : '请先进入商品详情';
+    if(it){
+      acts.innerHTML=`<button class="btn primary" onclick="navigator&&navigator.clipboard&&navigator.clipboard.writeText('pi-market://item/${it.id}');toast('已复制链接');closeSheet()">复制链接</button>`;
+    }
+  }else if(kind==='report'){
+    title.textContent='举报该商品';
+    body.innerHTML='请选择举报类型（Demo：不真实发送）：';
+    acts.innerHTML=['虚假描述','违禁品','涉嫌诈骗','其他'].map(t=>
+      `<button class="btn ghost" onclick="toast('已提交：${t}');closeSheet()">${t}</button>`).join('');
+  }
+  box.classList.add('on');
+}
+function closeSheet(){ document.getElementById('sheet').classList.remove('on'); }
+document.getElementById('sheet').addEventListener('click',(e)=>{ if(e.target.id==='sheet')closeSheet(); });
+
+/* ============ Nav ============ */
+function goto(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  const el = document.getElementById('view-'+name);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.nav button[data-v]').forEach(b=>{
+    b.classList.toggle('on', b.dataset.v===name);
+  });
+  const titles={home:['π 跳蚤市场','先锋二手 · 本地存储'],search:['搜索','关键词 / 分类 / 排序'],publish:['发布商品','0.1 π 发布费'],detail:['商品详情','本地演示'],chats:['消息中心','本地模拟对话'],chat:['聊天','与卖家沟通'],mine:['我的','个人中心'],admin:['运营后台','本地 Demo 面板']};
+  const t=titles[name]||titles.home;
+  document.getElementById('topTitle').textContent=t[0];
+  document.getElementById('topSub').textContent=t[1];
+  if(name==='home') renderHome();
+  if(name==='mine') renderMine();
+  const fab = document.getElementById('d-fab');
+  if(fab) fab.style.display = (name==='detail')?'flex':'none';
+  if(name==='search') { renderTagCloud(); onSearch(); }
+  if(name==='chats') renderChatList();
+  if(name==='admin') renderAdmin();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+document.querySelectorAll('.nav button[data-v]').forEach(b=>{
+  b.addEventListener('click', ()=>{ const v=b.dataset.v; if (v) goto(v); });
+});
+
+/* ============ Dark mode ============ */
+function toggleDark(){
+  state.dark = state.dark? 0 : 1;
+  document.documentElement.setAttribute('data-dark', state.dark?'1':'');
+  document.getElementById('darkBtn').textContent = state.dark? '☀' : '🌙';
+  const tg = document.getElementById('darkToggle');
+  if(tg) tg.classList.toggle('on', !!state.dark);
+  save();
+}
+
+/* ============ Home ============ */
+function setCat(c){ state.cat=c; renderHome(); }
+function toggleReco(){ state.onlyReco=!state.onlyReco; renderHome(); }
+function setSort(s){ state.sort=s; renderHome(); }
+
+function renderHome(){
+  const recoItems = state.items.filter(it=>it.tpl==='reco').slice(0,5);
+  const recos = document.getElementById('recos');
+  recos.innerHTML = recoItems.map(it=>`
+    <div class="reco" onclick="openDetail('${it.id}')">
+      <div class="img">${it.images && it.images[0] ? `<img src="${it.images[0]}"/>` : (it.emoji||'📦')}<span class="tag">🔥 推荐</span></div>
+      <div class="body">
+        <p class="t">${escapeHtml(it.title)}</p>
+        <div class="p">${fmtPrice(it.price)} <small style="color:var(--ink-2);font-weight:500">π</small></div>
+        <div class="meta"><span>${escapeHtml(it.seller||'')}</span><span>⭐ ${it.fav||0} · 👁 ${it.views||0}</span></div>
+      </div>
+    </div>
+  `).join('') || '<div class="empty">暂无推荐</div>';
+  document.getElementById('recoCount').textContent = recoItems.length? `共 ${recoItems.length} 件` : '';
+
+  document.getElementById('cats').innerHTML = CATS.map(c=>`
+    <button class="chip ${c===state.cat?'on':''}" onclick="setCat('${c}')"><span class="dot"></span>${CAT_ICON[c]||'•'} ${c}</button>
+  `).join('');
+  document.getElementById('catTip').textContent = state.cat;
+
+  const sorts=[['new','最新'],['priceAsc','价格 ↑'],['priceDesc','价格 ↓'],['hot','最热']];
+  document.getElementById('sortbar').innerHTML = sorts.map(s=>`
+    <button class="chip ${state.sort===s[0]?'on':''}" onclick="setSort('${s[0]}')"><span class="dot"></span>${s[1]}</button>
+  `).join('');
+  document.getElementById('toggleReco').textContent = state.onlyReco?'显示全部':'只看推荐';
+  document.getElementById('listTitle').textContent = state.onlyReco?'推荐商品':'最新发布';
+
+  let items = state.items.slice();
+  if (state.cat!=='全部') items = items.filter(i=>i.cat===state.cat);
+  if (state.onlyReco) items = items.filter(i=>i.tpl==='reco');
+  if (state.sort==='new') items.sort((a,b)=>b.createdAt-a.createdAt);
+  else if (state.sort==='priceAsc') items.sort((a,b)=>a.price-b.price);
+  else if (state.sort==='priceDesc') items.sort((a,b)=>b.price-a.price);
+  else if (state.sort==='hot') items.sort((a,b)=>(b.fav+b.views)-(a.fav+a.views));
+
+  const empty=document.getElementById('empty');
+  empty.style.display = items.length?'none':'block';
+  document.getElementById('list').innerHTML = items.map(it=>cardHTML(it)).join('');
+}
+function cardHTML(it){
+  const isFav = state.favs.includes(it.id);
+  const badges = [];
+  if(it.tpl==='reco') badges.push('<span class="badge">🔥 推荐</span>');
+  if(it.owner==='me') badges.push('<span class="badge verify">我的</span>');
+  const age = (Date.now()-it.createdAt)/3600000;
+  if(age<24) badges.push('<span class="badge new">新</span>');
+  return `
+    <div class="card" onclick="openDetail('${it.id}')">
+      <div class="pic">
+        ${it.images && it.images[0] ? `<img src="${it.images[0]}"/>` : (it.emoji||'📦')}
+        ${badges.join('')}
+        <button class="fav ${isFav?'on':''}" onclick="event.stopPropagation();toggleFav('${it.id}',this)">${isFav?'★':'☆'}</button>
+      </div>
+      <div class="info">
+        <p class="title">${escapeHtml(it.title)}</p>
+        <div class="price-row">
+          <div class="price">${fmtPrice(it.price)}<small> π</small></div>
+          <div style="font-size:11px;color:var(--ink-2)">${it.cat}</div>
+        </div>
+        <div class="seller">
+          <div class="avatar">${(it.seller||'U').slice(0,1)}</div>
+          <span>${escapeHtml(it.seller||'卖家')}</span>
+          <span class="fav-count">⭐ ${it.fav||0} · 👁 ${it.views||0}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ============ Detail ============ */
+let heroImgIdx = 0;
+function openDetail(id){
+  const it = state.items.find(x=>x.id===id);
+  if(!it){ toast('商品不存在'); return; }
+  state.currentDetailId = id;
+  it.views = (it.views||0)+1;
+  state.history = [{id,t:Date.now()}, ...state.history.filter(h=>h.id!==id)].slice(0,50);
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-detail').classList.add('active');
+  document.querySelectorAll('.nav button[data-v]').forEach(b=>b.classList.remove('on'));
+  document.getElementById('d-title').textContent = it.title;
+  document.getElementById('d-price').textContent = fmtPrice(it.price);
+  document.getElementById('d-desc').textContent = it.desc || '（卖家暂无描述）';
+  document.getElementById('d-seller').textContent = it.seller || '卖家';
+  document.getElementById('d-avatar').textContent = (it.seller||'U').slice(0,1);
+  document.getElementById('d-emoji').textContent = it.emoji || '📦';
+  document.getElementById('d-loc').textContent = it.city || '—';
+  const meta = document.getElementById('d-meta');
+  meta.innerHTML = [`<span>🏷 ${it.cat}</span>`,`<span>⭐ ${it.fav||0} 收藏</span>`,
+    `<span>👁 ${it.views||0} 浏览</span>`,`<span>🕓 ${timeAgo(it.createdAt)}</span>`,
+    `<span>#${it.id}</span>`].join('');
+  heroImgIdx = 0;
+  const hero = document.getElementById('d-hero');
+  const emojiEl = document.getElementById('d-emoji');
+  const dots = document.getElementById('d-dots');
+  if(it.images && it.images.length){
+    emojiEl.style.display='none';
+    let img = hero.querySelector('img');
+    if(!img){ img=document.createElement('img'); hero.insertBefore(img, hero.querySelector('.gallery-dots')||null); }
+    img.src = it.images[0];
+  }else{
+    emojiEl.style.display='';
+    const old = hero.querySelector('img'); if(old) old.remove();
+    emojiEl.textContent = it.emoji || '📦';
+  }
+  dots.innerHTML = it.images && it.images.length?
+    it.images.map((_,i)=>`<span class="${i===0?'on':''}"></span>`).join('') : '';
+  hero.onclick = (e)=>{
+    if(!it.images || !it.images.length) return;
+    const tg = e.target.closest('.back') || e.target.closest('.share'); if(tg) return;
+    heroImgIdx = (heroImgIdx+1) % it.images.length;
+    const img = hero.querySelector('img'); if(img) img.src = it.images[heroImgIdx];
+    dots.querySelectorAll('span').forEach((s,i)=>s.classList.toggle('on', i===heroImgIdx));
+  };
+  const isFav = state.favs.includes(id);
+  document.getElementById('d-fav-btn').textContent = (isFav?'⭐ 已收藏':'☆ 收藏');
+  document.getElementById('d-fab').style.display='flex';
+  drawFakeQR(id);
+  save();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+function toggleFavCurrent(){
+  const id = state.currentDetailId; if(!id) return;
+  toggleFav(id, null); openDetail(id);
+}
+function toggleFav(id, el){
+  const it = state.items.find(x=>x.id===id);
+  const idx = state.favs.indexOf(id);
+  if(idx>=0){ state.favs.splice(idx,1); toast('已取消收藏'); }
+  else { state.favs.push(id); toast('已收藏'); if(it) it.fav=(it.fav||0)+1; }
+  save();
+  if(el){
+    const on=state.favs.includes(id);
+    el.classList.toggle('on', on);
+    el.textContent = on?'★':'☆';
+  }
+}
+function fakeBuy(){ toast('（Demo）真实交易请走 Pi 钱包担保转账'); }
+function copySellerWallet(){
+  const it = state.items.find(x=>x.id===state.currentDetailId);
+  if(!it){ toast('未选择商品'); return; }
+  const wallet = it.sellerWallet || currentUser.walletAddress || '卖家未提供钱包';
+  if(navigator.clipboard) navigator.clipboard.writeText(wallet);
+  toast('卖家钱包已复制');
+}
+function drawFakeQR(id){
+  const canvas = document.getElementById('qrCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const size = 21; const cell = Math.floor(96/size);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,96,96);
+  ctx.fillStyle='#111';
+  let h = 0; for(let i=0;i<id.length;i++) h = (h*31 + id.charCodeAt(i)) >>> 0;
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      h = (h*1103515245 + 12345) >>> 0;
+      const on = (h%7) < 3;
+      const inCorner = (x<7 && y<7) || (x>=size-7 && y<7) || (x<7 && y>=size-7);
+      const border = inCorner && ((x===0||x===6||y===0||y===6) || (x===size-1||x===size-7||y===size-1||y===size-7));
+      const inner = inCorner && ((x>=2&&x<=4&&y>=2&&y<=4) || (x>=size-5&&x<=size-3&&y>=2&&y<=4) || (x>=2&&x<=4&&y>=size-5&&y<=size-3));
+      if(on || border || inner){ ctx.fillRect(x*cell, y*cell, cell, cell); }
+    }
+  }
+}
+
+/* ============ Publish ============ */
+let uploadImages = [];
+function setStep(n){
+  document.querySelectorAll('#steps .step').forEach(s=>{
+    const k = parseInt(s.dataset.step,10);
+    s.classList.toggle('on', k===n);
+    s.classList.toggle('done', k<n);
+  });
+}
+function onFiles(ev){
+  const files = [...(ev.target.files||[])];
+  for(const f of files){
+    if(uploadImages.length>=6){ toast('最多 6 张图片'); break; }
+    const reader = new FileReader();
+    reader.onload = e=>{ uploadImages.push(e.target.result); renderUploader(); };
+    reader.readAsDataURL(f);
+  }
+  ev.target.value='';
+}
+function renderUploader(){
+  document.getElementById('uploader').innerHTML = uploadImages.map((img,i)=>
+    `<div class="thumb" style="background-image:url(${img});background-size:cover;background-position:center"><img src="${img}" style="display:none"/><button type="button" class="x" onclick="removeImg(${i})" style="position:absolute;top:-6px;right:-6px;background:#fff;color:#333;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.1);border:none;cursor:pointer">✕</button></div>`
+  ).join('') + (uploadImages.length<6?`<button type="button" class="thumb" onclick="document.getElementById('f-files').click()">＋</button>`:'');
+}
+function removeImg(i){ uploadImages.splice(i,1); renderUploader(); }
+function clearForm(){
+  document.getElementById('publishForm').reset();
+  uploadImages = []; renderUploader();
+  document.getElementById('preview').style.display='none';
+  setStep(1);
+  const sellerEl = document.getElementById('f-seller');
+  if(sellerEl && currentUser.nickname && currentUser.nickname!=='本地用户') sellerEl.value = currentUser.nickname;
+}
+function togglePreview(){
+  const panel = document.getElementById('preview');
+  if(panel.style.display==='none' || !panel.style.display){
+    panel.style.display='block';
+    document.getElementById('previewBody').innerHTML = renderPreviewHTML();
+    setStep(2);
+  }else{ panel.style.display='none'; setStep(1); }
+}
+function renderPreviewHTML(){
+  const title=document.getElementById('f-title').value||'（未填）';
+  const cat=document.getElementById('f-cat').value;
+  const price=parseFloat(document.getElementById('f-price').value)||0;
+  const desc=document.getElementById('f-desc').value||'（未填）';
+  const seller=document.getElementById('f-seller').value||'你';
+  const city=document.getElementById('f-city').value||'';
+  return `<div class="card" style="box-shadow:none;border:1px solid var(--line);border-radius:14px;overflow:hidden">
+    <div class="pic" style="height:160px;background:linear-gradient(135deg,#f0f3fa,#fef0ea);display:grid;place-items:center;font-size:44px;color:#b8bfd1">${uploadImages[0]?`<img src="${uploadImages[0]}" style="width:100%;height:100%;object-fit:cover"/>`:(CAT_ICON[cat]||'📦')}</div>
+    <div class="info" style="padding:10px"><p class="title" style="font-size:14px;font-weight:600;margin:0">${escapeHtml(title)}</p>
+      <div class="price-row" style="margin-top:8px"><span style="color:var(--brand);font-weight:800">${fmtPrice(price)} <small style="color:var(--ink-2);font-weight:500">π</small></span><span style="font-size:11px;color:var(--ink-2);margin-left:auto">${cat}${city?' · '+city:''}</span></div>
+      <div class="seller" style="margin-top:8px;font-size:12px;color:var(--ink-2)">卖家：${escapeHtml(seller)}</div>
+    </div></div><div style="font-size:12px;color:var(--ink-2);margin-top:8px;white-space:pre-wrap">${escapeHtml(desc)}</div>`;
+}
+async function doPublish(ev){
+  ev.preventDefault();
+  const title = document.getElementById('f-title').value.trim();
+  const cat = document.getElementById('f-cat').value;
+  const price = parseFloat(document.getElementById('f-price').value);
+  const desc = document.getElementById('f-desc').value.trim();
+  const seller = document.getElementById('f-seller').value.trim();
+  const city = document.getElementById('f-city').value.trim();
+  const contact = document.getElementById('f-contact').value.trim();
+  if(!title || !desc || !seller || !price || price<=0){ toast('请完整填写信息'); return false; }
+
+  // ===== Pi 支付 =====
+  let paymentSuccess = false;
+  if (piSDKReady && isAuthenticated && ENABLE_REAL_PI_PAYMENT && typeof window.Pi !== 'undefined'){
+    try{
+      toast('正在发起 Pi 支付 0.1 π…');
+      const paymentData = { amount:0.1, memo:'π跳蚤市场 · 发布商品费用', metadata:{productTitle:title}, to:PLATFORM_WALLET };
+      const payment = await window.Pi.createPayment(paymentData);
+      await new Promise((resolve,reject)=>{ payment.onReadyForServerApproval(()=>resolve()); });
+      paymentSuccess = true;
+    } catch(e){
+      console.error(e);
+      toast('支付失败或已取消');
+      return false;
+    }
+  } else {
+    // 非 Pi Browser 环境：模拟确认
+    if(!confirm('模拟支付 0.1 π，确认发布？\n\n（在 Pi Browser 中连接账户后，可走真实 Pi 支付）')) return false;
+    paymentSuccess = true;
+  }
+
+  if(paymentSuccess){
+    const id = 'u_'+Math.random().toString(36).slice(2,8);
+    state.items.unshift({
+      id, title, cat, price, desc, seller, city, contact,
+      emoji: CAT_ICON[cat] || '📦',
+      images: uploadImages.slice(),
+      fav: 0, tpl:'', createdAt: Date.now(), owner:'me', views: 0,
+      sellerWallet: currentUser.walletAddress || '',
+    });
+    state.wallet = Math.max(0, state.wallet - 0.1);
+    save(); setStep(3);
+    toast('✅ 发布成功');
+    clearForm();
+    setTimeout(()=>goto('mine'), 800);
+  }
+  return false;
+}
+
+/* ============ Mine / Admin ============ */
+function switchMine(t){
+  state.mineTab=t;
+  document.getElementById('tab-post').classList.toggle('on', t==='post');
+  document.getElementById('tab-fav').classList.toggle('on', t==='fav');
+  document.getElementById('tab-hist').classList.toggle('on', t==='hist');
+  renderMine();
+}
+function renderMine(){
+  const mine = state.items.filter(i=>i.owner==='me');
+  document.getElementById('m-post').textContent = mine.length;
+  document.getElementById('m-fav').textContent = state.favs.length;
+  document.getElementById('m-pi').textContent = state.wallet.toFixed(1);
+  document.getElementById('m-view').textContent = state.items.reduce((a,b)=>a+(b.views||0),0);
+  document.getElementById('s-city').textContent = state.city || '未设置';
+
+  let items = [];
+  if(state.mineTab==='post') items = state.items.filter(i=>i.owner==='me');
+  else if(state.mineTab==='fav') items = state.items.filter(i=>state.favs.includes(i.id));
+  else { const ids = state.history.map(h=>h.id); items = ids.map(id=>state.items.find(i=>i.id===id)).filter(Boolean); }
+
+  const empty = document.getElementById('mine-empty');
+  empty.textContent = state.mineTab==='post'? '还没有发布过商品，去「发布」看看吧～'
+    : state.mineTab==='fav'? '暂无收藏，逛首页挑一挑～' : '暂无浏览记录';
+  empty.style.display = items.length?'none':'block';
+
+  document.getElementById('mine-list').innerHTML = items.map(it=>`
+    <div class="row-item">
+      <div class="pic" onclick="openDetail('${it.id}')">${it.images && it.images[0]?`<img src="${it.images[0]}"/>`:(it.emoji||'📦')}</div>
+      <div class="txt" onclick="openDetail('${it.id}')">
+        <h4>${escapeHtml(it.title)}</h4>
+        <div class="price">${fmtPrice(it.price)} π</div>
+        <div class="sub">${it.cat} · ${timeAgo(it.createdAt)} · ⭐ ${it.fav||0} · 👁 ${it.views||0}</div>
+      </div>
+      ${state.mineTab==='post'?`<button class="rm" onclick="removeMine('${it.id}')" style="color:#b91c1c;font-size:12px;background:transparent;border:1px solid #fecaca;padding:6px 10px;border-radius:999px;cursor:pointer">下架</button>`:''}
+    </div>`).join('');
+
+  const ab = document.getElementById('adminBox');
+  if(ab){
+    if(state.admin){ ab.style.display='block'; }
+    else { ab.style.display='none'; }
+  }
+}
+function removeMine(id){
+  if(!confirm('确定下架该商品？')) return;
+  state.items = state.items.filter(i=>i.id!==id);
+  state.favs = state.favs.filter(x=>x!==id);
+  save(); renderMine(); toast('已下架');
+}
+function toggleAdmin(){
+  state.adminClicks = (state.adminClicks||0)+1;
+  if(state.adminClicks>=5){
+    state.admin = state.admin?0:1;
+    state.adminClicks = 0;
+    save(); renderMine();
+    toast(state.admin? '已开启运营面板':'已隐藏运营面板');
+  }else{
+    document.getElementById('adminToggleHint').textContent = `· 再点击 ${5-state.adminClicks} 次开启运营面板 ·`;
+  }
+}
+function toggleAdminBoost(){
+  state.items.forEach(it=>{ it.views=(it.views||0)+50; it.fav=(it.fav||0)+3; });
+  save(); renderMine(); toast('已增加热度（Demo）');
+}
+function renderAdmin(){
+  document.getElementById('a-items').textContent = state.items.length;
+  document.getElementById('a-fav').textContent = state.favs.length;
+  document.getElementById('a-view').textContent = state.items.reduce((a,b)=>a+(b.views||0),0);
+  document.getElementById('a-chat').textContent = Object.keys(state.chats).length;
+  document.getElementById('adminList').innerHTML = state.items.map(it=>`
+    <div class="row-item">
+      <div class="pic" onclick="openDetail('${it.id}')">${it.images && it.images[0]?`<img src="${it.images[0]}"/>`:(it.emoji||'📦')}</div>
+      <div class="txt" onclick="openDetail('${it.id}')">
+        <h4>${escapeHtml(it.title)}</h4>
+        <div class="price">${fmtPrice(it.price)} π</div>
+        <div class="sub">${it.cat} · ${it.owner==='me'?'我发布':'Demo'} · ⭐ ${it.fav||0} · 👁 ${it.views||0}</div>
+      </div>
+      <button onclick="toggleRecoAdmin('${it.id}')" style="color:var(--brand);border:1px solid #ffd6c5;background:transparent;padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer">${it.tpl==='reco'?'取消推荐':'设为推荐'}</button>
+    </div>`).join('');
+}
+function toggleRecoAdmin(id){
+  const it = state.items.find(x=>x.id===id); if(!it) return;
+  it.tpl = (it.tpl==='reco'?'':'reco');
+  save(); renderAdmin(); toast(it.tpl==='reco'?'已设为推荐':'已取消推荐');
+}
+
+/* ============ Search / Tag cloud ============ */
+function renderTagCloud(){
+  const box = document.getElementById('tagcloud');
+  if(!box) return;
+  box.innerHTML = HOT_TAGS.map(t=>`<span class="t" onclick="document.getElementById('qInput').value='${t}';onSearch()">${t}</span>`).join('') +
+    CATS.filter(c=>c!=='全部').map(c=>`<span class="t" onclick="document.getElementById('qInput').value='${c}';onSearch()">${c}</span>`).join('');
+}
+function onSearch(){
+  const q=(document.getElementById('qInput').value||'').trim().toLowerCase();
+  const list=document.getElementById('searchList');
+  const empty=document.getElementById('searchEmpty');
+  if(!list) return;
+  if(!q){ list.innerHTML=''; empty.style.display='none'; return; }
+  const items = state.items.filter(i=>
+    (i.title||'').toLowerCase().includes(q) ||
+    (i.desc||'').toLowerCase().includes(q) ||
+    (i.cat||'').toLowerCase().includes(q) ||
+    (i.seller||'').toLowerCase().includes(q)
+  );
+  empty.style.display = items.length?'none':'block';
+  list.innerHTML = items.map(it=>cardHTML(it)).join('');
+}
+
+/* ============ Chat (simulated) ============ */
+function openDetailChat(){
+  const it = state.items.find(x=>x.id===state.currentDetailId);
+  if(!it){ toast('请先选择商品'); return; }
+  const key = 'u_'+it.seller+'_'+it.id;
+  if(!state.chats[key]){
+    state.chats[key] = {
+      seller: it.seller, itemId: it.id, itemTitle: it.title,
+      messages:[{from:'seller', text:'你好，对「'+it.title+'」感兴趣吗？', t:Date.now()-3600*1000}],
+      last: Date.now()-3600*1000,
     };
-    
-    let piSDKReady = false;
-    let isAuthenticated = false;
-    
-    // ================== Pi SDK 身份验证（自动触发） ==================
-    async function initPiAndAuthenticate() {
-        // 检查是否在 Pi Browser 中
-        if (typeof window.Pi === 'undefined') {
-            console.warn("Not in Pi Browser, using mock mode.");
-            document.getElementById("userStatus").innerText = "演示模式";
-            // 使用模拟用户（仅用于本地测试）
-            currentUser = {
-                nickname: "演示用户",
-                walletAddress: "GA7DEMO...",
-                contact: "demo@pi"
-            };
-            updateUserUI();
-            return;
-        }
-        
-        try {
-            // 初始化 Pi SDK (sandbox: false 主网, true 测试网)
-            await window.Pi.init({ version: "2.0", sandbox: false });
-            piSDKReady = true;
-            console.log("Pi SDK initialized");
-            
-            // 自动触发身份验证（会弹出 Pi 授权窗口）
-            const auth = await window.Pi.authenticate(['username', 'wallet_address']);
-            if (auth && auth.username) {
-                currentUser.nickname = auth.username;
-                currentUser.walletAddress = auth.wallet_address || "";
-                currentUser.contact = `pi://user/${auth.username}`;
-                isAuthenticated = true;
-                document.getElementById("userStatus").innerText = "已认证";
-                console.log("Authenticated user:", currentUser);
-            } else {
-                throw new Error("Authentication failed");
-            }
-        } catch (error) {
-            console.error("Pi SDK init or auth error:", error);
-            document.getElementById("userStatus").innerText = "认证失败，使用演示模式";
-            // 降级为模拟用户
-            currentUser = {
-                nickname: "演示用户",
-                walletAddress: "GA7DEMO...",
-                contact: "demo@pi"
-            };
-        }
-        updateUserUI();
-    }
-    
-    function updateUserUI() {
-        const nicknameSpan = document.getElementById("userNickname");
-        if (nicknameSpan) nicknameSpan.innerText = currentUser.nickname;
-        // 刷新我的页面中的商品列表（因为卖家地址可能变化）
-        if (typeof renderMyProducts === 'function') renderMyProducts();
-        if (typeof renderList === 'function') renderList();
-    }
-    
-    // ================== 原有数据与函数 ==================
-    let defaultProducts = [
-        { id: "p1", title: "iPhone 12 黑色", description: "9成新，无拆修，电池85%", price: 25, category: "手机数码", city: "佳木斯", images: ["https://picsum.photos/id/0/400/400"], seller: "数码哥", sellerWallet: "GA7...W2X1", contact: "微信: iphone123", time: Date.now(), status: "active", favorites: 0 },
-        { id: "p2", title: "小米手环7", description: "全新未拆封", price: 8, category: "手机数码", city: "哈尔滨", images: ["https://picsum.photos/id/20/400/400"], seller: "运动君", sellerWallet: "GB8...X2X2", contact: "tg: @mi", time: Date.now()-86400000, status: "active", favorites: 0 },
-        { id: "p3", title: "宜家书桌", description: "白色1.2米，几乎全新", price: 15, category: "家居生活", city: "佳木斯", images: ["https://picsum.photos/id/100/400/400"], seller: "家居刘", sellerWallet: "GC9...Y3Y3", contact: "微信: yijia", time: Date.now()-172800000, status: "active", favorites: 0 }
-    ];
-    let products = [];
-    let uploadImages = [];
-    let currentSort = "asc";
-    let favoriteMap = JSON.parse(localStorage.getItem("favorites") || "{}");
-    let editingProductId = null;
-    
-    function loadData() {
-        let stored = localStorage.getItem("pi_flea_v4");
-        if(stored) {
-            products = JSON.parse(stored);
-            let defaultIds = defaultProducts.map(p=>p.id);
-            let existingIds = products.map(p=>p.id);
-            for(let dp of defaultProducts) if(!existingIds.includes(dp.id)) products.unshift(dp);
-        } else products = [...defaultProducts];
-        saveData();
-    }
-    function saveData() { localStorage.setItem("pi_flea_v4", JSON.stringify(products)); }
-    function saveFavorites() { localStorage.setItem("favorites", JSON.stringify(favoriteMap)); }
-    function showToast(msg) { let t=document.getElementById("toast"); t.innerText=msg; t.style.opacity="1"; setTimeout(()=>t.style.opacity="0",2000); }
-    function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m=> m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
-    
-    function renderList() {
-        let keyword = document.getElementById("searchInput").value.trim().toLowerCase();
-        let activeCat = document.querySelector(".filter-chip.active")?.dataset.cat || "all";
-        let filtered = products.filter(p => p.status === "active");
-        if(keyword) filtered = filtered.filter(p => p.title.toLowerCase().includes(keyword) || p.description.toLowerCase().includes(keyword));
-        if(activeCat !== "all") filtered = filtered.filter(p => p.category === activeCat);
-        filtered.sort((a,b) => currentSort === "asc" ? a.price - b.price : b.price - a.price);
-        const container = document.getElementById("productListContainer");
-        if(filtered.length===0) { container.innerHTML = '<div class="empty-state">🌟 暂无商品，去发布一个吧</div>'; return; }
-        container.innerHTML = filtered.map(p => {
-            let isFav = favoriteMap[p.id] || false;
-            return `<div class="product-card" onclick="goDetail('${p.id}')">
-                <img class="product-img" src="${p.images[0]}" onerror="this.src='https://picsum.photos/id/1/110/110'">
-                <div class="product-info">
-                    <div class="product-title">${escapeHtml(p.title)}</div>
-                    <div class="product-price">${p.price}</div>
-                    <div class="product-meta"><span>📍 ${escapeHtml(p.city)}</span><span>❤️ ${p.favorites||0}</span></div>
-                    <div class="favorite-icon" onclick="event.stopPropagation(); toggleFavorite('${p.id}')">${isFav ? '❤️' : '🤍'}</div>
-                </div>
-            </div>`;
-        }).join("");
-    }
-    function toggleFavorite(id) { if(favoriteMap[id]) delete favoriteMap[id]; else favoriteMap[id]=true; saveFavorites(); renderList(); }
-    
-    function goDetail(id) {
-        let p = products.find(x=>x.id===id);
-        if(!p) return;
-        let imagesHtml = `<div class="swiper-container">` + p.images.map(img => `<img src="${img}">`).join('') + `</div>`;
-        let otherProducts = products.filter(x => x.sellerWallet === p.sellerWallet && x.id !== p.id && x.status === "active").slice(0,3);
-        let otherHtml = otherProducts.length ? `<div class="other-products"><strong>Ta的其他商品</strong>${otherProducts.map(op => `
-            <div class="other-item" onclick="goDetail('${op.id}')">
-                <img class="other-img" src="${op.images[0]}">
-                <div><div>${escapeHtml(op.title)}</div><div style="color:#ff3b30;">π ${op.price}</div></div>
-            </div>`).join('')}</div>` : '';
-        document.getElementById("detailContent").innerHTML = `
-            ${imagesHtml}
-            <div class="detail-info">
-                <div class="detail-title">${escapeHtml(p.title)}</div>
-                <div class="detail-price">π ${p.price}</div>
-                <div class="seller-card"><div class="seller-avatar">👤</div><div><strong>${escapeHtml(p.seller)}</strong><br><span style="font-size:12px;">${escapeHtml(p.city)}</span></div></div>
-                <div style="margin:16px 0;"><strong>描述</strong><br>${escapeHtml(p.description)}</div>
-                ${otherHtml}
-                <button class="copy-btn" onclick="copyWallet('${p.sellerWallet}')">📋 复制卖家钱包</button>
-                <button class="contact-btn" onclick="showToast('联系: ${p.contact}')">💬 联系卖家</button>
-            </div>
-        `;
-        showPage("detailPage");
-    }
-    function copyWallet(wallet) { navigator.clipboard.writeText(wallet); showToast("钱包地址已复制，请去Pi Wallet转账"); }
-    
-    async function publishProduct() {
-        let title = document.getElementById("pubTitle").value.trim();
-        let desc = document.getElementById("pubDesc").value.trim();
-        let price = parseFloat(document.getElementById("pubPrice").value);
-        let category = document.getElementById("pubCategory").value;
-        let city = document.getElementById("pubCity").value.trim();
-        let contact = document.getElementById("pubContact").value.trim();
-        if(!title || !desc || isNaN(price) || !city || !contact) { showToast("请填写完整信息"); return false; }
-        
-        let paymentSuccess = false;
-        // 真实支付（仅在 Pi Browser 且已认证时）
-        if (piSDKReady && isAuthenticated && ENABLE_REAL_PI_PAYMENT && typeof window.Pi !== 'undefined') {
-            try {
-                const paymentData = {
-                    amount: 0.1,
-                    memo: "Pi跳蚤市场发布商品费用",
-                    metadata: { productTitle: title },
-                    to: PLATFORM_WALLET
-                };
-                const payment = await window.Pi.createPayment(paymentData);
-                await new Promise((resolve, reject) => {
-                    payment.onReadyForServerApproval(() => resolve());
-                    // 实际生产环境应调用后端验证，这里简化处理
-                });
-                paymentSuccess = true;
-                showToast("支付成功！商品已发布");
-            } catch(e) {
-                console.error(e);
-                showToast("支付失败或取消");
-                return false;
-            }
-        } else {
-            if(!confirm("模拟支付0.1 π，确定发布？")) return false;
-            paymentSuccess = true;
-        }
-        
-        if(paymentSuccess) {
-            let images = uploadImages.length ? uploadImages : ["https://picsum.photos/id/26/400/400"];
-            let newProduct = {
-                id: Date.now()+'-'+Math.random().toString(36).substr(2,6),
-                title, description: desc, price, category, city,
-                images, seller: currentUser.nickname, sellerWallet: currentUser.walletAddress, contact,
-                time: Date.now(), status: "active", favorites: 0
-            };
-            products.unshift(newProduct);
-            saveData();
-            document.getElementById("pubTitle").value = "";
-            document.getElementById("pubDesc").value = "";
-            document.getElementById("pubPrice").value = "";
-            document.getElementById("pubCity").value = "";
-            document.getElementById("pubContact").value = "";
-            uploadImages = [];
-            renderImagePreviews();
-            showToast("发布成功！");
-            renderList();
-            return true;
-        }
-        return false;
-    }
-    
-    function editProduct(id) {
-        let product = products.find(p => p.id === id);
-        if(!product) return;
-        editingProductId = id;
-        document.getElementById("pubTitle").value = product.title;
-        document.getElementById("pubDesc").value = product.description;
-        document.getElementById("pubPrice").value = product.price;
-        document.getElementById("pubCategory").value = product.category;
-        document.getElementById("pubCity").value = product.city;
-        document.getElementById("pubContact").value = product.contact;
-        uploadImages = [...product.images];
-        renderImagePreviews();
-        let submitBtn = document.getElementById("submitPublish");
-        submitBtn.innerText = "保存修改";
-        submitBtn.onclick = saveEdit;
-        showPage("publishPage");
-    }
-    function saveEdit() {
-        let title = document.getElementById("pubTitle").value.trim();
-        let desc = document.getElementById("pubDesc").value.trim();
-        let price = parseFloat(document.getElementById("pubPrice").value);
-        let category = document.getElementById("pubCategory").value;
-        let city = document.getElementById("pubCity").value.trim();
-        let contact = document.getElementById("pubContact").value.trim();
-        if(!title || !desc || isNaN(price) || !city || !contact) { showToast("请填写完整"); return; }
-        let idx = products.findIndex(p => p.id === editingProductId);
-        if(idx !== -1) {
-            products[idx] = { ...products[idx], title, description: desc, price, category, city, contact, images: uploadImages.length ? uploadImages : products[idx].images };
-            saveData();
-            showToast("修改成功");
-        }
-        document.getElementById("submitPublish").innerText = "发布 · 支付0.1 π";
-        document.getElementById("submitPublish").onclick = () => publishProduct();
-        editingProductId = null;
-        document.getElementById("pubTitle").value = "";
-        document.getElementById("pubDesc").value = "";
-        document.getElementById("pubPrice").value = "";
-        document.getElementById("pubCity").value = "";
-        document.getElementById("pubContact").value = "";
-        uploadImages = [];
-        renderImagePreviews();
-        showPage("profilePage");
-        renderMyProducts();
-        renderList();
-    }
-    
-    function setupImageUpload() {
-        const fileInput = document.getElementById("imageFileInput");
-        document.getElementById("addImageBtn").onclick = () => fileInput.click();
-        fileInput.onchange = (e) => {
-            let files = Array.from(e.target.files);
-            let remain = 6 - uploadImages.length;
-            files.slice(0, remain).forEach(f => {
-                let reader = new FileReader();
-                reader.onload = ev => { uploadImages.push(ev.target.result); renderImagePreviews(); };
-                reader.readAsDataURL(f);
-            });
-            fileInput.value = "";
-        };
-    }
-    function renderImagePreviews() {
-        let container = document.getElementById("imagePreviewList");
-        container.innerHTML = uploadImages.map((img, idx) => `<div class="image-preview-item"><img src="${img}"><div class="remove-img" onclick="removeImage(${idx})">✕</div></div>`).join("");
-    }
-    window.removeImage = function(idx) { uploadImages.splice(idx,1); renderImagePreviews(); };
-    
-    function renderMyProducts() {
-        let my = products.filter(p => p.sellerWallet === currentUser.walletAddress && p.status === "active");
-        let container = document.getElementById("myProductsContainer");
-        if(my.length===0) { container.innerHTML = '<div class="empty-state">还没有发布过商品</div>'; return; }
-        container.innerHTML = my.map(p => `
-            <div class="my-item">
-                <div><strong>${escapeHtml(p.title)}</strong><br><span style="color:#ff3b30;">π ${p.price}</span><br><span style="font-size:12px;">${escapeHtml(p.city)}</span></div>
-                <div class="my-item-actions">
-                    <button onclick="editProduct('${p.id}')" style="background:#ff9f0a; color:white; border:none; padding:6px 16px; border-radius:30px;">编辑</button>
-                    <button onclick="deleteMyProduct('${p.id}')" style="background:#ff3b30; color:white; border:none; padding:6px 16px; border-radius:30px;">下架</button>
-                </div>
-            </div>
-        `).join("");
-    }
-    function deleteMyProduct(id) {
-        let idx = products.findIndex(p=>p.id===id);
-        if(idx!==-1) { products[idx].status = "sold"; saveData(); renderMyProducts(); renderList(); showToast("已下架"); }
-    }
-    
-    function showPage(pageId) {
-        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        document.querySelectorAll('.tab-item').forEach(tab=>tab.classList.remove('active'));
-        document.querySelector(`.tab-item[data-page="${pageId}"]`).classList.add('active');
-        if(pageId === 'listPage') renderList();
-        if(pageId === 'profilePage') renderMyProducts();
-    }
-    
-    // 页面启动
-    window.onload = async () => {
-        loadData();
-        renderList();
-        setupImageUpload();
-        // 先进行 Pi 身份验证（自动弹窗）
-        await initPiAndAuthenticate();
-        
-        // 绑定事件
-        document.querySelectorAll('.filter-chip').forEach(chip => {
-            chip.onclick = () => { document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active')); chip.classList.add('active'); renderList(); };
-        });
-        document.getElementById("sortBtn").onclick = () => {
-            currentSort = currentSort === "asc" ? "desc" : "asc";
-            document.getElementById("sortBtn").innerHTML = currentSort === "asc" ? "💰 价格 ↑" : "💰 价格 ↓";
-            renderList();
-        };
-        document.getElementById("searchInput").addEventListener("input", renderList);
-        document.getElementById("submitPublish").onclick = () => publishProduct();
-        document.querySelectorAll('.tab-item').forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
-        
-        // 全局函数挂载
-        window.goDetail = goDetail;
-        window.copyWallet = copyWallet;
-        window.deleteMyProduct = deleteMyProduct;
-        window.toggleFavorite = toggleFavorite;
-        window.editProduct = editProduct;
-    };
+    save();
+  }
+  openChat(key);
+}
+function renderChatList(){
+  const keys = Object.keys(state.chats).sort((a,b)=> (state.chats[b].last||0)-(state.chats[a].last||0));
+  const box = document.getElementById('chatList');
+  const empty = document.getElementById('chatEmpty');
+  if(!box) return;
+  empty.style.display = keys.length?'none':'block';
+  box.innerHTML = keys.map(k=>{
+    const c = state.chats[k];
+    const last = c.messages[c.messages.length-1] || {text:'（尚无消息）'};
+    return `<div class="row-item" onclick="openChat('${k}')" style="background:var(--card);border-radius:14px;padding:12px;display:flex;gap:12px;align-items:center;box-shadow:var(--shadow);cursor:pointer">
+      <div class="avatar" style="width:40px;height:40px;font-size:14px">${escapeHtml((c.seller||'?').slice(0,1))}</div>
+      <div class="t" style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px">${escapeHtml(c.seller||'卖家')}</div>
+        <div style="font-size:12px;color:var(--ink-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(last.text||'')}</div>
+      </div>
+      <div style="font-size:12px;color:var(--ink-2)">${timeAgo(c.last||0)}</div>
+    </div>`;
+  }).join('');
+}
+let currentChatKey = null;
+function openChat(key){
+  currentChatKey = key;
+  const c = state.chats[key];
+  if(!c){ toast('会话不存在'); return; }
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-chat').classList.add('active');
+  document.getElementById('chat-name').textContent = c.seller || '卖家';
+  document.getElementById('chat-sub').textContent = '关于「'+(c.itemTitle||'闲置')+'」';
+  document.getElementById('chat-avatar').textContent = (c.seller||'?').slice(0,1);
+  renderBubbles();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+function renderBubbles(){
+  const c = state.chats[currentChatKey]; if(!c) return;
+  const box = document.getElementById('msgArea');
+  box.innerHTML = c.messages.map(m=>`
+    <div class="bubble ${m.from==='me'?'me':''}" style="max-width:78%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.55;background:var(--card);box-shadow:var(--shadow);white-space:pre-wrap;${m.from==='me'?'background:linear-gradient(135deg,#ff8f3f,var(--brand));color:#fff;margin-left:auto':''}">${escapeHtml(m.text)}
+      <div class="meta" style="font-size:11px;${m.from==='me'?'color:rgba(255,255,255,.85)':'color:var(--ink-2)'};margin-top:4px">${timeAgo(m.t)}</div>
+    </div>`).join('');
+  setTimeout(()=>window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}), 50);
+}
+function sendMsg(){
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim(); if(!text) return;
+  const c = state.chats[currentChatKey]; if(!c) return;
+  c.messages.push({from:'me', text, t: Date.now()});
+  inp.value = '';
+  renderBubbles();
+  const replies = ['好的，欢迎面交～','这件商品成色确实不错。','在的，方便的话可以看看实物。','好的，价格可以小🔪。','支持担保交易更安心。'];
+  setTimeout(()=>{
+    if(!state.chats[currentChatKey]) return;
+    const cc = state.chats[currentChatKey];
+    cc.messages.push({from:'seller', text: replies[Math.floor(Math.random()*replies.length)], t:Date.now()});
+    cc.last = Date.now();
+    save(); renderBubbles();
+  }, 900 + Math.random()*800);
+  c.last = Date.now();
+  save();
+}
+
+/* ============ Utils ============ */
+function fmtPrice(p){ const n = Number(p); return (Math.round(n*100)/100).toString(); }
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function timeAgo(t){
+  if(!t) return '—';
+  const d = Date.now()-t;
+  if(d<60000) return '刚刚';
+  if(d<3600000) return Math.floor(d/60000)+' 分钟前';
+  if(d<86400000) return Math.floor(d/3600000)+' 小时前';
+  return Math.floor(d/86400000)+' 天前';
+}
+
+/* ============ Import / Export ============ */
+function exportData(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='pi-flea-demo.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 500);
+  toast('已导出本地数据');
+}
+function resetData(){
+  if(!confirm('重置会清空本地发布与收藏，继续？')) return;
+  localStorage.removeItem(STORE_KEY);
+  location.reload();
+}
+
+/* ============ Init ============ */
+function applyDarkOnLoad(){
+  if(state.dark){
+    document.documentElement.setAttribute('data-dark','1');
+    document.getElementById('darkBtn').textContent='☀';
+  }
+  const tg = document.getElementById('darkToggle');
+  if(tg) tg.classList.toggle('on', !!state.dark);
+}
+applyDarkOnLoad();
+renderHome();
+
+// 自动检测 Pi SDK 环境并提示
+window.addEventListener('load', ()=>{
+  if(typeof window.Pi !== 'undefined'){
+    // 在 Pi Browser 中：自动发起认证
+    setTimeout(()=>initPiAndAuthenticate(false), 600);
+  } else {
+    // 在普通浏览器中：提示
+    const box = document.getElementById('piAuthBox');
+    if(box){ box.style.display='flex'; box.querySelector('.btn-sm')?.remove(); }
+  }
+});
 </script>
 </body>
 </html>
