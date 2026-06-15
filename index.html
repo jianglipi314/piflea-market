@@ -740,7 +740,7 @@ function renderHome() {
 
 function recoHTML(it) {
   return `<div class="reco" onclick="openDetail(${it.id})">
-    <div class="img">${it.images && it.images[0] ? `<img src="${it.images[0]}"/>` : it.emoji}<span class="tag">🔥 推荐</span></div>
+    <div class="img">${it.images && it.images[0] ? `<img src="${it.images[0]}" loading="lazy" decoding="async"/>` : it.emoji}<span class="tag">🔥 推荐</span></div>
     <div class="body">
       <p class="t">${escapeHtml(it.title)}</p>
       <div class="p">${fmtPrice(it.price)} <small style="color:var(--ink-2)">π</small></div>
@@ -755,7 +755,7 @@ function cardHTML(it) {
   if (it.city) badges.push('<span class="badge verify">认证</span>');
   return `<div class="card" onclick="openDetail(${it.id})">
     <div class="pic">
-      ${it.images && it.images[0] ? `<img src="${it.images[0]}"/>` : it.emoji}
+      ${it.images && it.images[0] ? `<img src="${it.images[0]}" loading="lazy" decoding="async"/>` : it.emoji}
       ${badges.join('')}
       <button class="fav ${isFav(it.id)?'on':''}" onclick="event.stopPropagation();toggleFav(${it.id},this)">${isFav(it.id)?'★':'☆'}</button>
     </div>
@@ -819,6 +819,7 @@ async function openDetail(id) {
     emojiEl.style.display = 'none';
     let img = hero.querySelector('img');
     if (!img) { img = document.createElement('img'); hero.insertBefore(img, hero.querySelector('.gallery-dots')||null); }
+    img.decoding = 'async';
     img.src = it.images[0];
   } else {
     emojiEl.style.display = '';
@@ -905,6 +906,8 @@ function drawFakeQR(id) {
 
 /* ============ Publish ============ */
 let uploadImages = [];
+const IMAGE_MAX_WIDTH = 800;
+const IMAGE_QUALITY = 0.85;
 
 function clearForm() {
   document.getElementById('publishForm').reset();
@@ -929,19 +932,49 @@ async function onFiles(ev) {
   const files = [...(ev.target.files||[])];
   for (const f of files) {
     if (uploadImages.length >= 6) { toast('最多 6 张图片'); break; }
-    const reader = new FileReader();
-    reader.onload = e => {
-      uploadImages.push(e.target.result);
+    if (!f.type.startsWith('image/')) { toast('只能上传图片文件'); continue; }
+    try {
+      toast('正在压缩图片...');
+      const compressed = await compressImage(f);
+      uploadImages.push(compressed);
       renderUploader();
-    };
-    reader.readAsDataURL(f);
+    } catch(e) {
+      console.error('compressImage error', e);
+      toast('图片处理失败，请换一张图片');
+    }
   }
   ev.target.value = '';
 }
 
+function compressImage(file, maxWidth = IMAGE_MAX_WIDTH, quality = IMAGE_QUALITY) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('读取图片失败'));
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('图片格式不支持'));
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function renderUploader() {
   document.getElementById('uploader').innerHTML =
-    uploadImages.map((src, i) => `<div class="thumb"><img src="${src}"/><button class="x" onclick="removeImg(${i})">×</button></div>`).join('') +
+    uploadImages.map((src, i) => `<div class="thumb"><img src="${src}" loading="lazy" decoding="async"/><button class="x" onclick="removeImg(${i})">×</button></div>`).join('') +
     (uploadImages.length < 6 ? `<button type="button" class="thumb" onclick="document.getElementById('f-files').click()">＋</button>` : '');
 }
 
@@ -967,7 +1000,7 @@ function renderPreviewHTML() {
   const seller = document.getElementById('f-seller').value || '你';
   const city = document.getElementById('f-city').value || '';
   return `<div class="card" style="box-shadow:none;border:1px solid var(--line);cursor:default">
-    <div class="pic" style="height:160px">${uploadImages[0] ? `<img src="${uploadImages[0]}"/>` : CAT_ICON[cat]||'📦'}</div>
+    <div class="pic" style="height:160px">${uploadImages[0] ? `<img src="${uploadImages[0]}" loading="lazy" decoding="async"/>` : CAT_ICON[cat]||'📦'}</div>
     <div class="info"><p class="title">${escapeHtml(title)}</p>
       <div class="price-row"><div class="price">${fmtPrice(price)}<small> π</small></div><div style="font-size:11px;color:var(--ink-2)">${cat}${city?' · '+city:''}</div></div>
       <div class="seller"><div class="avatar">${escapeHtml(seller.slice(0,1))}</div><span>${escapeHtml(seller)}</span></div>
@@ -988,7 +1021,7 @@ async function uploadImageToSupabase(base64Data, filename) {
     return urlData.publicUrl;
   } catch(e) {
     console.error('uploadImageToSupabase error', e);
-    return base64Data;
+    throw new Error('图片上传失败，请检查网络或稍后重试');
   }
 }
 
@@ -1144,7 +1177,7 @@ async function renderMine() {
     empty.style.display = items.length ? 'none' : 'block';
     document.getElementById('mine-list').innerHTML = items.map(it =>
       `<div class="row-item">
-        <div class="pic" onclick="openDetail(${it.id})">${it.images&&it.images[0]?`<img src="${it.images[0]}"/>`:it.emoji||'📦'}</div>
+        <div class="pic" onclick="openDetail(${it.id})">${it.images&&it.images[0]?`<img src="${it.images[0]}" loading="lazy" decoding="async"/>`:it.emoji||'📦'}</div>
         <div class="txt" onclick="openDetail(${it.id})">
           <h4>${escapeHtml(it.title)}</h4>
           <div class="price">${fmtPrice(it.price)} π</div>
@@ -1203,7 +1236,7 @@ async function renderAdmin() {
     document.getElementById('adminLoader').style.display = 'none';
     document.getElementById('adminList').innerHTML = allItems.map(it =>
       `<div class="row-item">
-        <div class="pic" onclick="openDetail(${it.id})">${it.images&&it.images[0]?`<img src="${it.images[0]}"/>`:it.emoji||'📦'}</div>
+        <div class="pic" onclick="openDetail(${it.id})">${it.images&&it.images[0]?`<img src="${it.images[0]}" loading="lazy" decoding="async"/>`:it.emoji||'📦'}</div>
         <div class="txt" onclick="openDetail(${it.id})">
           <h4>${escapeHtml(it.title)}</h4>
           <div class="price">${fmtPrice(it.price)} π</div>
