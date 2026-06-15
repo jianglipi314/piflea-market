@@ -394,7 +394,7 @@
         <div class="name" id="m-name">本地用户</div>
         <div class="id" id="m-id">uid_local_0001 · 平台认证</div>
       </div>
-      <button class="edit" onclick="toast('已编辑（Demo）')">编辑资料</button>
+      <button class="edit" onclick="editMyName()">编辑昵称</button>
     </div>
     <div class="wallet">
       <div class="cell"><div class="n" id="m-post">0</div><div class="l">我的发布</div></div>
@@ -912,6 +912,9 @@ function clearForm() {
   renderUploader();
   document.getElementById('preview').style.display = 'none';
   setStep(1);
+  // 自动回填上次的昵称
+  const me = localStorage.getItem('pi_flea_me');
+  if (me) document.getElementById('f-seller').value = me;
 }
 
 function setStep(n) {
@@ -999,6 +1002,8 @@ async function doPublish(ev) {
   const seller = document.getElementById('f-seller').value.trim();
   const city = document.getElementById('f-city').value.trim();
   if (!title || !desc || !seller || !price || price <= 0) { toast('请完整填写信息'); return false; }
+  // 记住当前用户昵称，用于"我的发布"过滤
+  localStorage.setItem('pi_flea_me', seller);
 
   const btn = document.getElementById('f-submit');
   btn.disabled = true;
@@ -1085,6 +1090,17 @@ async function submitItem(data) {
 }
 
 /* ============ Mine ============ */
+function editMyName() {
+  const cur = localStorage.getItem('pi_flea_me') || '';
+  const v = prompt('请输入你发布商品时使用的昵称（要和发布时一致才能匹配到）', cur);
+  if (v === null) return;
+  const name = v.trim();
+  if (!name) { toast('昵称不能为空'); return; }
+  localStorage.setItem('pi_flea_me', name);
+  toast('已保存：' + name);
+  renderMine();
+}
+
 function switchMine(t) {
   state.mineTab = t;
   document.getElementById('tab-post').classList.toggle('on', t === 'post');
@@ -1098,15 +1114,18 @@ async function renderMine() {
   document.getElementById('mine-list').innerHTML = '';
   document.getElementById('mine-empty').style.display = 'none';
   try {
-    const myItems = state.items.filter(i => i.seller === document.getElementById('m-name').textContent);
+    const meName = localStorage.getItem('pi_flea_me') || '';
+    // 把昵称同步显示到顶部
+    if (meName) {
+      document.getElementById('m-name').textContent = meName;
+      document.getElementById('m-avatar').textContent = meName.slice(0,1);
+    }
+    const myItems = meName ? state.items.filter(i => (i.seller||'') === meName) : [];
     document.getElementById('m-post').textContent = myItems.length;
     const favStored = JSON.parse(localStorage.getItem('pi_flea_favs')||'[]');
     document.getElementById('m-fav').textContent = favStored.length;
-    document.getElementById('m-view').textContent = state.items.reduce((a,b)=>a+(b.views||0),0);
+    document.getElementById('m-view').textContent = myItems.reduce((a,b)=>a+(b.views||0),0);
     document.getElementById('s-city').textContent = state.city || '未设置';
-    const firstSeller = myItems[0]?.seller || '本地用户';
-    document.getElementById('m-name').textContent = firstSeller;
-    document.getElementById('m-avatar').textContent = (firstSeller||'我').slice(0,1);
 
     let items = [];
     if (state.mineTab === 'post') items = myItems;
@@ -1117,7 +1136,11 @@ async function renderMine() {
     }
     document.getElementById('mineLoader').style.display = 'none';
     const empty = document.getElementById('mine-empty');
-    empty.textContent = state.mineTab==='post'?'还没有发布过商品':'暂无收藏，逛首页挑一挑～';
+    if (state.mineTab==='post' && !meName) {
+      empty.textContent = '还没有发布过商品，去发布一个吧～';
+    } else {
+      empty.textContent = state.mineTab==='post'?'还没有发布过商品':'暂无收藏，逛首页挑一挑～';
+    }
     empty.style.display = items.length ? 'none' : 'block';
     document.getElementById('mine-list').innerHTML = items.map(it =>
       `<div class="row-item">
