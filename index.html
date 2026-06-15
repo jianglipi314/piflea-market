@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>π 跳蚤市场 · 先锋二手</title>
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
   :root{
     --bg:#f4f5f9;
@@ -531,12 +530,7 @@ function createRestSupabaseClient(url, key) {
 }
 (function initSupabase() {
   try {
-    const sbLib = window.supabase || window.Supabase;
-    if (sbLib && sbLib.createClient) {
-      supabaseClient = sbLib.createClient(SUPABASE_URL, SUPABASE_KEY);
-    } else {
-      supabaseClient = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
-    }
+    supabaseClient = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
   } catch (e) {
     console.error('supabase init error', e);
     supabaseClient = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
