@@ -368,6 +368,14 @@
         </div>
         <div class="right" id="d-loc">—</div>
       </div>
+      <div class="seller-row" id="d-contact-row" style="display:none">
+        <div class="avatar" style="background:var(--brand);color:#fff">📞</div>
+        <div class="t">
+          <div class="name" style="font-size:13px">卖家联系方式</div>
+          <div class="sub" id="d-contact" style="font-size:12px;color:var(--brand);font-weight:600;word-break:break-all">—</div>
+        </div>
+        <button class="btn ghost" id="d-copy-contact" style="padding:8px 14px;font-size:12px">复制</button>
+      </div>
     </div>
     <div class="desc" id="d-desc">—</div>
     <div class="action-row">
@@ -582,6 +590,24 @@ const HIST_KEY = 'pi_flea_hist_v3';
 const CHAT_KEY = 'pi_flea_chats_v3';
 const ADMIN_KEY = 'pi_flea_admin_v3';
 const ADMIN_CLICK_KEY = 'pi_flea_admin_clicks';
+const OWNER_KEY = 'pi_flea_owner_v3';
+
+// 生成本地稳定用户 ID —— 第一次打开时生成，之后不会改变
+function getOwnerId() {
+  let uid = localStorage.getItem(OWNER_KEY);
+  if (!uid) {
+    const rnd = (n) => {
+      const s = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let out = '';
+      for (let i=0;i<n;i++) out += s[Math.floor(Math.random()*s.length)];
+      return out;
+    };
+    uid = 'u_' + Date.now().toString(36) + '_' + rnd(8);
+    localStorage.setItem(OWNER_KEY, uid);
+  }
+  return uid;
+}
+const OWNER_ID = getOwnerId();
 
 const state = {
   items: [],
@@ -607,6 +633,25 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// 老浏览器复制文本的兜底方案
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand && document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast(ok ? '已复制：' + text : '复制失败，请手动复制');
+  } catch (e) {
+    toast('复制失败，请手动复制');
+  }
 }
 
 /* ============ Sheet ============ */
@@ -711,7 +756,8 @@ async function loadItems() {
       id: d.id, title: d.title, price: d.price, cat: d.category, seller: d.seller,
       emoji: CAT_ICON[d.category] || '📦',
       desc: d.description || '', images: d.images || [],
-      city: d.city || '', fav: d.fav_count || 0,
+      city: d.city || '', contact: d.contact || '',
+      fav: d.fav_count || 0, owner_id: d.owner_id || '',
       views: d.views || 0, tpl: (d.tpl !== undefined && d.tpl !== null) ? d.tpl : '',
       createdAt: new Date(d.created_at).getTime()
     }));
@@ -825,6 +871,24 @@ async function openDetail(id) {
   document.getElementById('d-emoji').textContent = it.emoji || '📦';
   document.getElementById('d-loc').textContent = it.city || '—';
   document.getElementById('d-seller-sub').textContent = '平台认证卖家 · 👁 ' + (it.views||0) + ' 次浏览';
+  // 联系方式：有则显示并绑定复制按钮
+  const contactRow = document.getElementById('d-contact-row');
+  const contactEl = document.getElementById('d-contact');
+  const copyBtn = document.getElementById('d-copy-contact');
+  if (it.contact && it.contact.trim()) {
+    contactEl.textContent = it.contact.trim();
+    contactRow.style.display = 'flex';
+    copyBtn.onclick = () => {
+      const txt = it.contact.trim();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(() => toast('已复制：' + txt), () => fallbackCopy(txt));
+      } else {
+        fallbackCopy(txt);
+      }
+    };
+  } else {
+    contactRow.style.display = 'none';
+  }
   document.getElementById('d-meta').innerHTML = [
     `<span>🏷 ${it.cat}</span>`,
     `<span>⭐ ${it.fav||0} 收藏</span>`,
@@ -1052,12 +1116,27 @@ async function doPublish(ev) {
   if (state.uploading) return;
   const title = document.getElementById('f-title').value.trim();
   const cat = document.getElementById('f-cat').value;
-  const price = parseFloat(document.getElementById('f-price').value);
+  const priceRaw = document.getElementById('f-price').value.trim();
   const desc = document.getElementById('f-desc').value.trim();
   const seller = document.getElementById('f-seller').value.trim();
   const city = document.getElementById('f-city').value.trim();
-  if (!title || !desc || !seller || !price || price <= 0) { toast('请完整填写信息'); return false; }
-  // 记住当前用户昵称，用于"我的发布"过滤
+  const contact = document.getElementById('f-contact').value.trim();
+
+  const price = parseFloat(priceRaw);
+
+  // 严格校验
+  if (title.length < 2) { toast('商品标题至少 2 个字'); return false; }
+  if (title.length > 40) { toast('商品标题最多 40 个字'); return false; }
+  if (!price || price <= 0) { toast('请填写合理的价格'); return false; }
+  if (price > 1000000) { toast('价格过高，请确认'); return false; }
+  if (desc.length < 4) { toast('商品描述至少 4 个字'); return false; }
+  if (desc.length > 500) { toast('商品描述最多 500 个字'); return false; }
+  if (!seller || seller.length < 2) { toast('请填写卖家昵称'); return false; }
+  if (seller.length > 16) { toast('卖家昵称最多 16 个字'); return false; }
+  if (contact.length > 30) { toast('联系方式最多 30 个字'); return false; }
+  if (city.length > 20) { toast('所在城市最多 20 个字'); return false; }
+
+  // 记住当前用户昵称，用于"我的发布"过滤（兼容老版本，主要以 OWNER_ID 为准）
   localStorage.setItem('pi_flea_me', seller);
 
   const btn = document.getElementById('f-submit');
@@ -1072,9 +1151,13 @@ async function doPublish(ev) {
       const url = await uploadImageToSupabase(uploadImages[i], `img_${i}.jpg`);
       uploadedUrls.push(url);
     }
-    await submitItem({ title, price, cat, desc, seller, city, images: uploadedUrls });
+    await submitItem({
+      title, price, cat, desc, seller, city, contact,
+      images: uploadedUrls,
+      owner_id: OWNER_ID
+    });
   } catch(e) {
-    toast('发布失败：' + (e.message || '未知错误'));
+    toast('发布失败：' + (e.message || '未知错误');
     btn.disabled = false;
     btn.textContent = '免费发布';
     state.uploading = false;
@@ -1088,7 +1171,9 @@ async function submitItem(data) {
   const { data: inserted, error } = await supabaseClient.from('items').insert({
     title: data.title, price: data.price, category: data.cat,
     description: data.desc, seller: data.seller, city: data.city,
-    images: data.images, views: 0, fav_count: 0
+    contact: data.contact || '',
+    images: data.images, views: 0, fav_count: 0,
+    owner_id: data.owner_id
   }).select().single();
   if (error) {
     toast('保存失败：' + error.message);
@@ -1137,7 +1222,12 @@ async function renderMine() {
       document.getElementById('m-name').textContent = meName;
       document.getElementById('m-avatar').textContent = meName.slice(0,1);
     }
-    const myItems = meName ? state.items.filter(i => (i.seller||'') === meName) : [];
+    // 过滤我的发布：优先按 owner_id 匹配，否则回退到昵称匹配
+    const myItems = state.items.filter(i => {
+      if (i.owner_id) return i.owner_id === OWNER_ID;
+      if (meName && (i.seller||'') === meName) return true;
+      return false;
+    });
     document.getElementById('m-post').textContent = myItems.length;
     const favStored = JSON.parse(localStorage.getItem('pi_flea_favs')||'[]');
     document.getElementById('m-fav').textContent = favStored.length;
@@ -1178,8 +1268,21 @@ async function renderMine() {
 }
 
 async function removeMine(id) {
+  const item = state.items.find(i => i.id === id);
+  // 前端权限校验：仅允许下架本人发布的商品（有 owner_id 时强校验，没有时回退到昵称）
+  if (item) {
+    const isMine = item.owner_id
+      ? (item.owner_id === OWNER_ID)
+      : ((item.seller||'') === (localStorage.getItem('pi_flea_me')||''));
+    if (!isMine) {
+      toast('无权操作此商品');
+      return;
+    }
+  }
   if (!confirm('确定下架该商品？')) return;
-  const { error } = await supabaseClient.from('items').delete().eq('id', id);
+  const { error } = await supabaseClient.from('items').delete()
+    .eq('id', id)
+    .eq('owner_id', OWNER_ID);
   if (error) { toast('下架失败'); return; }
   state.items = state.items.filter(i => i.id !== id);
   toast('已下架');
@@ -1208,8 +1311,9 @@ async function renderAdmin() {
     const allItems = (data||[]).map(d => ({
       id: d.id, title: d.title, price: d.price, cat: d.category, seller: d.seller,
       emoji: CAT_ICON[d.category]||'📦', desc: d.description||'',
-      images: d.images||[], city: d.city||'',
-      fav: d.fav_count||0, views: d.views||0, tpl: d.tpl||'',
+      images: d.images||[], city: d.city||'', contact: d.contact||'',
+      fav: d.fav_count||0, owner_id: d.owner_id||'',
+      views: d.views||0, tpl: d.tpl||'',
       createdAt: new Date(d.created_at).getTime()
     }));
     document.getElementById('a-items').textContent = allItems.length;
@@ -1269,8 +1373,9 @@ async function onSearch() {
     const results = (data||[]).map(d => ({
       id: d.id, title: d.title, price: d.price, cat: d.category, seller: d.seller,
       emoji: CAT_ICON[d.category]||'📦', desc: d.description||'',
-      images: d.images||[], city: d.city||'',
-      fav: d.fav_count||0, views: d.views||0, tpl: d.tpl||'',
+      images: d.images||[], city: d.city||'', contact: d.contact||'',
+      fav: d.fav_count||0, owner_id: d.owner_id||'',
+      views: d.views||0, tpl: d.tpl||'',
       createdAt: new Date(d.created_at).getTime()
     }));
     loader.style.display = 'none';
