@@ -457,7 +457,7 @@
 /* ============ Supabase Init ============ */
 const SUPABASE_URL = 'https://xiuzymzcjkbhkzffojiw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6Ep5bW6y4ttuyLrd9PLObw_Q7fpvFmS';
-let supabase = null;
+let supabaseClient = null;
 function createRestSupabaseClient(url, key) {
   const restHeaders = {
     apikey: key,
@@ -533,13 +533,13 @@ function createRestSupabaseClient(url, key) {
   try {
     const sbLib = window.supabase || window.Supabase;
     if (sbLib && sbLib.createClient) {
-      supabase = sbLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+      supabaseClient = sbLib.createClient(SUPABASE_URL, SUPABASE_KEY);
     } else {
-      supabase = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
+      supabaseClient = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
     }
   } catch (e) {
     console.error('supabase init error', e);
-    supabase = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
+    supabaseClient = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
   }
 })();
 
@@ -674,14 +674,14 @@ async function loadItems() {
   document.getElementById('listLoader').style.display = 'block';
   document.getElementById('list').innerHTML = '';
   document.getElementById('empty').style.display = 'none';
-  if (!supabase) {
+  if (!supabaseClient) {
     document.getElementById('listLoader').style.display = 'none';
     toast('云端连接中，请稍候...');
     setTimeout(loadItems, 800);
     return;
   }
   try {
-    let query = supabase.from('items').select('*');
+    let query = supabaseClient.from('items').select('*');
     if (state.cat !== '全部') query = query.eq('category', state.cat);
     let sortCol = 'created_at';
     let asc = false;
@@ -792,7 +792,7 @@ async function openDetail(id) {
   if (!it) { toast('商品不存在'); return; }
   state.currentDetailId = id;
   // 增加浏览量
-  supabase.from('items').update({ views: (it.views||0)+1 }).eq('id', id).then(() => {});
+  supabaseClient.from('items').update({ views: (it.views||0)+1 }).eq('id', id).then(() => {});
   it.views = (it.views||0) + 1;
   state.history = [{id, t:Date.now()}, ...state.history.filter(h => h.id !== id)].slice(0, 50);
   localStorage.setItem(HIST_KEY, JSON.stringify(state.history));
@@ -985,9 +985,9 @@ async function uploadImageToSupabase(base64Data, filename) {
     for (let i=0; i<binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const ext = filename.split('.').pop() || 'jpg';
     const path = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
-    const { error } = await supabase.storage.from('images').upload(path, bytes, { contentType: `image/${ext}` });
+    const { error } = await supabaseClient.storage.from('images').upload(path, bytes, { contentType: `image/${ext}` });
     if (error) throw error;
-    const { data: urlData } = supabase.storage.from('images').getPublicUrl(path);
+    const { data: urlData } = supabaseClient.storage.from('images').getPublicUrl(path);
     return urlData.publicUrl;
   } catch(e) {
     console.error('uploadImageToSupabase error', e);
@@ -1069,7 +1069,7 @@ async function doPublish(ev) {
 async function submitItem(data) {
   const btn = document.getElementById('f-submit');
   btn.textContent = '保存到云端...';
-  const { data: inserted, error } = await supabase.from('items').insert({
+  const { data: inserted, error } = await supabaseClient.from('items').insert({
     title: data.title, price: data.price, category: data.cat,
     description: data.desc, seller: data.seller, city: data.city,
     images: data.images, views: 0, fav_count: 0
@@ -1145,7 +1145,7 @@ async function renderMine() {
 
 async function removeMine(id) {
   if (!confirm('确定下架该商品？')) return;
-  const { error } = await supabase.from('items').delete().eq('id', id);
+  const { error } = await supabaseClient.from('items').delete().eq('id', id);
   if (error) { toast('下架失败'); return; }
   state.items = state.items.filter(i => i.id !== id);
   toast('已下架');
@@ -1170,7 +1170,7 @@ async function renderAdmin() {
   document.getElementById('adminLoader').style.display = 'block';
   document.getElementById('adminList').innerHTML = '';
   try {
-    const { data } = await supabase.from('items').select('*').order('created_at', { ascending: false });
+    const { data } = await supabaseClient.from('items').select('*').order('created_at', { ascending: false });
     const allItems = (data||[]).map(d => ({
       id: d.id, title: d.title, price: d.price, cat: d.category, seller: d.seller,
       emoji: CAT_ICON[d.category]||'📦', desc: d.description||'',
@@ -1204,7 +1204,7 @@ async function renderAdmin() {
 async function toggleRecoAdmin(id) {
   const it = state.items.find(x => x.id === id); if (!it) return;
   const newTpl = it.tpl === 'reco' ? '' : 'reco';
-  const { error } = await supabase.from('items').update({ tpl: newTpl }).eq('id', id);
+  const { error } = await supabaseClient.from('items').update({ tpl: newTpl }).eq('id', id);
   if (error) { toast('操作失败'); return; }
   it.tpl = newTpl;
   toast(newTpl ? '已设为推荐' : '已取消推荐');
@@ -1227,7 +1227,7 @@ async function onSearch() {
   if (!q) { list.innerHTML = ''; empty.style.display = 'none'; return; }
   loader.style.display = 'block'; list.innerHTML = ''; empty.style.display = 'none';
   try {
-    let query = supabase.from('items').select('*').or(`title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%,seller.ilike.%${q}%`);
+    let query = supabaseClient.from('items').select('*').or(`title.ilike.%${q}%,description.ilike.%${q}%,category.ilike.%${q}%,seller.ilike.%${q}%`);
     if (state.cat !== '全部') query = query.eq('category', state.cat);
     query = query.order('created_at', { ascending: false });
     const { data, error } = await query;
