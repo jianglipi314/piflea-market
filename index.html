@@ -458,14 +458,88 @@
 const SUPABASE_URL = 'https://xiuzymzcjkbhkzffojiw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6Ep5bW6y4ttuyLrd9PLObw_Q7fpvFmS';
 let supabase = null;
+function createRestSupabaseClient(url, key) {
+  const restHeaders = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json'
+  };
+  function makeBuilder(table) {
+    const state = { table, action: 'select', body: null, filters: [], orderBy: null, orExpr: '', singleRow: false };
+    const builder = {
+      select() { state.action = state.action === 'insert' || state.action === 'update' ? state.action : 'select'; return builder; },
+      insert(body) { state.action = 'insert'; state.body = body; return builder; },
+      update(body) { state.action = 'update'; state.body = body; return builder; },
+      delete() { state.action = 'delete'; return builder; },
+      eq(col, val) { state.filters.push([col, val]); return builder; },
+      order(col, opts) { state.orderBy = [col, opts && opts.ascending !== false ? 'asc' : 'desc']; return builder; },
+      or(expr) { state.orExpr = expr; return builder; },
+      single() { state.singleRow = true; return builder; },
+      then(resolve, reject) { return execute().then(resolve, reject); }
+    };
+    async function execute() {
+      const endpoint = new URL(`${url}/rest/v1/${state.table}`);
+      endpoint.searchParams.set('select', '*');
+      state.filters.forEach(([col, val]) => endpoint.searchParams.set(col, `eq.${val}`));
+      if (state.orExpr) endpoint.searchParams.set('or', `(${state.orExpr})`);
+      if (state.orderBy) endpoint.searchParams.set('order', `${state.orderBy[0]}.${state.orderBy[1]}`);
+      const options = { headers: { ...restHeaders, Prefer: 'return=representation' } };
+      if (state.action === 'insert') { options.method = 'POST'; options.body = JSON.stringify(state.body); }
+      else if (state.action === 'update') { options.method = 'PATCH'; options.body = JSON.stringify(state.body); }
+      else if (state.action === 'delete') { options.method = 'DELETE'; }
+      else { options.method = 'GET'; }
+      try {
+        const res = await fetch(endpoint.toString(), options);
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : null;
+        if (!res.ok) return { data: null, error: data || { message: res.statusText } };
+        return { data: state.singleRow && Array.isArray(data) ? data[0] : data, error: null };
+      } catch (error) {
+        return { data: null, error };
+      }
+    }
+    return builder;
+  }
+  return {
+    from(table) { return makeBuilder(table); },
+    storage: {
+      from(bucket) {
+        return {
+          async upload(path, bytes, opts) {
+            try {
+              const res = await fetch(`${url}/storage/v1/object/${bucket}/${path}`, {
+                method: 'POST',
+                headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': (opts && opts.contentType) || 'application/octet-stream' },
+                body: bytes
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({ message: res.statusText }));
+                return { data: null, error: err };
+              }
+              return { data: await res.json().catch(() => ({})), error: null };
+            } catch (error) {
+              return { data: null, error };
+            }
+          },
+          getPublicUrl(path) {
+            return { data: { publicUrl: `${url}/storage/v1/object/public/${bucket}/${path}` } };
+          }
+        };
+      }
+    }
+  };
+}
 (function initSupabase() {
   try {
     const sbLib = window.supabase || window.Supabase;
     if (sbLib && sbLib.createClient) {
       supabase = sbLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } else {
+      supabase = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
     }
   } catch (e) {
     console.error('supabase init error', e);
+    supabase = createRestSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
   }
 })();
 
