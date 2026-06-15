@@ -244,7 +244,7 @@
   <section class="view active" id="view-home">
     <div class="banner">
       <h2>零门槛卖闲置 · 用 π 秒级到账</h2>
-      <p>发布费仅 <b>0.1 π</b>，平台担保交易 · 云端实时同步</p>
+      <p><b>免费发布</b>，平台担保交易 · 云端实时同步</p>
       <span class="coin">π</span>
       <button class="cta" onclick="goto('publish')">立即发布 →</button>
     </div>
@@ -282,12 +282,12 @@
     </div>
     <div class="rules">
       <b>📌 上架规则</b><br/>
-      · 发布前缴纳 <b>0.1 π</b> 发布费（派浏览器内走真实 Pi 支付）<br/>
+      · 现在支持 <b>免费发布</b>，无需任何发布费用<br/>
       · 商品图片最多上传 <b>6 张</b>，需真实上传到云端存储<br/>
       · 所有商品云端同步，所有用户可见
     </div>
     <div class="fee-box">
-      <div class="l">平台服务费</div><div class="r">0.1 π</div>
+      <div class="l">平台服务费</div><div class="r">免费</div>
     </div>
     <form class="form" id="publishForm" onsubmit="doPublish(event)">
       <div class="row"><label>商品标题 *</label>
@@ -321,7 +321,7 @@
       <div class="actions">
         <button type="button" class="btn ghost" onclick="clearForm()">清空</button>
         <button type="button" class="btn ghost" id="btnPreview" onclick="togglePreview()">预览</button>
-        <button type="submit" class="btn primary" id="f-submit">发布（支付 0.1 π）</button>
+        <button type="submit" class="btn primary" id="f-submit">免费发布</button>
       </div>
     </form>
   </section>
@@ -596,7 +596,7 @@ function openSheet(kind) {
   acts.innerHTML = '';
   if (kind === 'menu') {
     title.textContent = 'π 跳蚤市场';
-    body.innerHTML = '欢迎来到 π 跳蚤市场！<br/>· 🔍 搜索页按关键词 / 分类筛选<br/>· 📝 发布商品需 0.1 π 发布费<br/>· 💬 与卖家对话（本地模拟）<br/>· 👤 个人中心查看发布 / 收藏<br/>· 🌙 切换浅色 / 深色主题<br/>· ⇪ 分享商品 / 举报违规';
+    body.innerHTML = '欢迎来到 π 跳蚤市场！<br/>· 🔍 搜索页按关键词 / 分类筛选<br/>· 📝 发布商品永久免费<br/>· 💬 与卖家对话（本地模拟）<br/>· 👤 个人中心查看发布 / 收藏<br/>· 🌙 切换浅色 / 深色主题<br/>· ⇪ 分享商品 / 举报违规';
     acts.innerHTML = `<button class="btn ghost" onclick="closeSheet();goto('search')">去搜索</button><button class="btn primary" onclick="closeSheet();goto('publish')">发闲置</button>`;
   } else if (kind === 'share') {
     const it = state.items.find(x => x.id === state.currentDetailId);
@@ -622,7 +622,7 @@ function goto(name) {
   const titles = {
     home: ['π 跳蚤市场','先锋二手 · 云端数据'],
     search: ['搜索','关键词 / 分类 / 排序'],
-    publish: ['发布商品','0.1 π 发布费'],
+    publish: ['发布商品','免费发布'],
     detail: ['商品详情','云端实时同步'],
     chats: ['消息中心','本地模拟对话'],
     chat: ['聊天','与卖家沟通'],
@@ -1050,49 +1050,11 @@ async function doPublish(ev) {
       const url = await uploadImageToSupabase(uploadImages[i], `img_${i}.jpg`);
       uploadedUrls.push(url);
     }
-
-    btn.textContent = '请在 Pi Browser 中确认支付...';
-    const paymentData = {
-      amount: 0.1,
-      memo: `发布商品：「${title}」`,
-      metadata: { type: 'publish_fee', title, seller, cat }
-    };
-
-    if (PiIsAvailable && window.Pi) {
-      window.Pi.createPayment(paymentData, {
-        onReadyForServerApproval: function(paymentId) {
-          btn.textContent = '支付确认中...';
-        },
-        onReadyForServerCompletion: function(paymentId, txId) {
-          submitItem({ title, price, cat, desc, seller, city, images: uploadedUrls });
-        },
-        onCancel: function(paymentId) {
-          toast('支付取消');
-          btn.disabled = false;
-          btn.textContent = '发布（支付 0.1 π）';
-          state.uploading = false;
-        },
-        onError: function(error, paymentId) {
-          toast('支付失败：' + error.message);
-          btn.disabled = false;
-          btn.textContent = '发布（支付 0.1 π）';
-          state.uploading = false;
-        }
-      });
-    } else {
-      const confirmPay = confirm('（模拟模式）确认发布「' + title + '」？平台将收取 0.1 π 发布费。');
-      if (!confirmPay) {
-        btn.disabled = false;
-        btn.textContent = '发布（支付 0.1 π）';
-        state.uploading = false;
-        return false;
-      }
-      submitItem({ title, price, cat, desc, seller, city, images: uploadedUrls });
-    }
+    await submitItem({ title, price, cat, desc, seller, city, images: uploadedUrls });
   } catch(e) {
     toast('发布失败：' + (e.message || '未知错误'));
     btn.disabled = false;
-    btn.textContent = '发布（支付 0.1 π）';
+    btn.textContent = '免费发布';
     state.uploading = false;
   }
   return false;
@@ -1109,7 +1071,7 @@ async function submitItem(data) {
   if (error) {
     toast('保存失败：' + error.message);
     btn.disabled = false;
-    btn.textContent = '发布（支付 0.1 π）';
+    btn.textContent = '免费发布';
     state.uploading = false;
     return;
   }
@@ -1118,7 +1080,7 @@ async function submitItem(data) {
   clearForm();
   setTimeout(() => goto('mine'), 800);
   btn.disabled = false;
-  btn.textContent = '发布（支付 0.1 π）';
+  btn.textContent = '免费发布';
   state.uploading = false;
 }
 
