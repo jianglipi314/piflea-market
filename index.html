@@ -1107,7 +1107,7 @@ async function doPublish(ev) {
       owner_id: OWNER_ID
     });
   } catch(e) {
-    toast('发布失败：' + (e.message || '未知错误');
+    toast('发布失败：' + (e.message || '未知错误'));
     btn.disabled = false;
     btn.textContent = '免费发布';
     state.uploading = false;
