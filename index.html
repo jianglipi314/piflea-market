@@ -581,10 +581,12 @@ function initPiAndAuthenticate() {
   const isPiBrowser = typeof window.Pi !== 'undefined';
   
   if (isPiBrowser) {
-    // Pi SDK 2.0 初始化 - 使用正确的sandbox配置
-    // 生产环境用 false，测试环境用 true
-    const isSandbox = window.location.hostname.includes('github.io') === false && 
-                      window.location.hostname !== 'jianglipi314.github.io';
+    // Pi SDK 2.0 初始化
+    // GitHub Pages是测试环境，用sandbox: true
+    // 正式上线域名用sandbox: false
+    const isSandbox = window.location.hostname.includes('github.io') || 
+                      window.location.hostname === 'localhost' ||
+                      window.location.hostname === '127.0.0.1';
     
     window.Pi.init({ version: "2.0", sandbox: isSandbox })
       .then(function() {
@@ -642,11 +644,14 @@ function authenticateWithPi() {
     return;
   }
   
-  // Pi SDK 2.0 authenticate 用法
+  // Pi SDK 2.0 authenticate 返回 Promise
   const scopes = ['username', 'payments'];
   
-  window.Pi.authenticate(scopes, function(authResult) {
-    // 登录成功回调
+  window.Pi.authenticate(scopes, function onIncompletePaymentFound(payment) {
+    // 处理未完成支付的回调
+    console.log('Incomplete payment found:', payment);
+  }).then(function(authResult) {
+    // 登录成功
     if (authResult && authResult.user) {
       piUser = {
         uid: authResult.user.uid,
@@ -658,11 +663,13 @@ function authenticateWithPi() {
       updatePiButtonState();
       toast('✅ Pi 登录成功：@' + piUser.username);
     }
-  }, function(error) {
-    // 登录失败或取消回调
+  }).catch(function(error) {
+    // 登录失败或用户取消
     console.error('Pi auth error:', error);
     if (error && error.message) {
       toast('登录失败：' + error.message);
+    } else {
+      toast('登录失败，请重试');
     }
   });
 }
