@@ -1501,82 +1501,175 @@ async function doSearch() {
   }
 }
 
-/* ============ Chat ============ */
-function openDetailChat() {
-  const it = state.items.find(x => x.id === state.currentDetailId);
-  if (!it) { toast('请先选择商品'); return; }
-  const key = 'u_' + it.seller + '_' + it.id;
-  if (!state.chats[key]) {
-    state.chats[key] = {
-      seller: it.seller, itemId: it.id, itemTitle: it.title,
-      messages: [{ from: 'seller', text: '你好，对「'+it.title+'」感兴趣吗？', t: Date.now()-3600*1000 }],
-      last: Date.now()-3600*1000
-    };
-    localStorage.setItem(CHAT_KEY, JSON.stringify(state.chats));
-  }
-  openChat(key);
-}
+/* ============ Chat (Cloud) ============ */
+let chatSub = null; // realtime subscription
+let messagesCache = []; // 缓存当前会话消息
+let currentChatKey = null;
 
-function renderChatList() {
-  const keys = Object.keys(state.chats).sort((a,b) => (state.chats[b].last||0)-(state.chats[a].last||0));
-  const box = document.getElementById('chatList');
+async function loadChatList() {
+  if (!supabaseClient) return;
+  const list = document.getElementById('chatList');
   const empty = document.getElementById('chatEmpty');
-  empty.style.display = keys.length ? 'none' : 'block';
-  box.innerHTML = keys.map(k => {
-    const c = state.chats[k];
-    const last = c.messages[c.messages.length-1] || {text:'（尚无消息）'};
-    return `<div class="chat-item" onclick="openChat('${k}')">
-      <div class="avatar">${escapeHtml((c.seller||'?').slice(0,1))}</div>
-      <div class="t"><div class="name">${escapeHtml(c.seller||'卖家')}</div><div class="last">${escapeHtml(last.text||'')}</div></div>
-      <div class="time">${timeAgo(c.last||0)}</div>
+  const count = document.getElementById('chatCount');
+  // 找到所有跟我有关的消息，按对方uid分组
+  const me = OWNER_ID;
+  const { data, error } = await supabaseClient.from('messages').select('*')
+    .or(`from_uid.eq.${me},to_uid.eq.${me}`)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) {
+    console.error('loadChatList', error);
+    // 优雅降级：表可能未建
+    empty.textContent = '云端消息表未就绪，请按提示创建 messages 表';
+    empty.style.display = 'block';
+    count.textContent = '';
+    return;
+  }
+  // 按会话分组：会话key = sorted(from_uid, to_uid) + '_' + itemId
+  const groups = {};
+  (data||[]).forEach(m => {
+    const k = m.item_id + '|' + [m.from_uid, m.to_uid].sort().join('|');
+    if (!groups[k]) {
+      groups[k] = { key: k, itemId: m.item_id, from: m.from_uid, to: m.to_uid, messages: [], last: 0 };
+    }
+    groups[k].messages.push(m);
+    if (new Date(m.created_at).getTime() > groups[k].last) groups[k].last = new Date(m.created_at).getTime();
+  });
+  const list2 = Object.values(groups);
+  empty.style.display = list2.length ? 'none' : 'block';
+  empty.textContent = '还没有消息，点进商品页联系卖家试试～';
+  count.textContent = list2.length ? `共 ${list2.length} 个会话` : '';
+  list.innerHTML = list2.map(g => {
+    const last = g.messages[g.messages.length - 1];
+    // 找对方
+    const isMeSender = last.from_uid === me;
+    // 尝试从商品中查对方昵称
+    const item = state.items.find(x => x.id === Number(g.itemId) || x.id === g.itemId);
+    const sellerName = isMeSender ? (item ? item.seller : '卖家') : (item ? (item.seller || '卖家') : '买家');
+    return `<div class="chat-item" onclick="openChatByKey('${g.key}')">
+      <div class="avatar">${escapeHtml((sellerName||'π').slice(0,1))}</div>
+      <div class="t"><div class="name">${escapeHtml(sellerName||'聊天')}</div><div class="last">${escapeHtml(last.text||'')}</div></div>
+      <div class="time">${timeAgo(g.last)}</div>
     </div>`;
   }).join('');
-  document.getElementById('chatCount').textContent = keys.length ? `共 ${keys.length} 个会话` : '';
 }
 
-let currentChatKey = null;
-function openChat(key) {
+async function openChatByKey(key) {
+  const [itemId, uid1, uid2] = key.split('|');
+  const me = OWNER_ID;
+  const other = uid1 === me ? uid2 : uid1;
   currentChatKey = key;
-  const c = state.chats[key];
-  if (!c) { toast('会话不存在'); return; }
+  const item = state.items.find(x => String(x.id) === itemId);
+  await openChatReal(item, other);
+}
+
+async function openDetailChat() {
+  const it = state.items.find(x => x.id === state.currentDetailId);
+  if (!it) return;
+  // 阻止跟自己发消息
+  if (it.owner_id && it.owner_id === OWNER_ID) {
+    toast('这是你自己的商品');
+    return;
+  }
+  const me = OWNER_ID;
+  const other = it.owner_id || ('seller_' + (it.seller||'unknown'));
+  const key = it.id + '|' + [me, other].sort().join('|');
+  currentChatKey = key;
+  await openChatReal(it, other);
+}
+
+async function openChatReal(item, otherUid) {
+  if (!item) { toast('商品不存在'); return; }
+  const me = OWNER_ID;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-chat').classList.add('active');
   document.getElementById('topTitle').textContent = '聊天';
-  document.getElementById('topSub').textContent = '与卖家沟通';
-  document.getElementById('chat-name').textContent = c.seller || '卖家';
-  document.getElementById('chat-sub').textContent = '关于「'+(c.itemTitle||'闲置')+'」';
-  document.getElementById('chat-avatar').textContent = (c.seller||'?').slice(0,1);
-  renderBubbles();
+  document.getElementById('topSub').textContent = '关于「' + (item.title||'闲置') + '」';
+  document.getElementById('chat-name').textContent = item.seller || '卖家';
+  document.getElementById('chat-sub').textContent = '关于「' + (item.title||'闲置') + '」';
+  document.getElementById('chat-avatar').textContent = (item.seller||'?').slice(0,1);
+  await loadMessages(item.id, me, otherUid);
+  subscribeMessages(item.id, me, otherUid);
   window.scrollTo({top:0, behavior:'instant'});
 }
 
-function renderBubbles() {
-  const c = state.chats[currentChatKey]; if (!c) return;
-  const box = document.getElementById('msgArea');
-  box.innerHTML = c.messages.map(m =>
-    `<div class="bubble ${m.from==='me'?'me':''}">${escapeHtml(m.text)}<div class="meta">${timeAgo(m.t)}</div></div>`
-  ).join('');
+async function loadMessages(itemId, me, other) {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('messages').select('*')
+    .or(`and(from_uid.eq.${me},to_uid.eq.${other}),and(from_uid.eq.${other},to_uid.eq.${me})`)
+    .eq('item_id', itemId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    toast('消息加载失败：' + error.message);
+    return;
+  }
+  messagesCache = (data||[]).map(m => ({
+    from: m.from_uid === me ? 'me' : 'seller',
+    text: m.text,
+    t: new Date(m.created_at).getTime()
+  }));
+  renderBubbles();
 }
 
-function sendMsg() {
+function subscribeMessages(itemId, me, other) {
+  // 取消旧订阅
+  if (chatSub) { try { chatSub.unsubscribe(); } catch(e){} chatSub = null; }
+  if (!supabaseClient || !supabaseClient.channel) return;
+  try {
+    chatSub = supabaseClient.channel('msg_' + itemId + '_' + Date.now())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        const m = payload.new;
+        if (String(m.item_id) !== String(itemId)) return;
+        if (![me, other].includes(m.from_uid)) return;
+        if (![me, other].includes(m.to_uid)) return;
+        // 避免重复
+        if (messagesCache.find(x => x.t === new Date(m.created_at).getTime() && x.text === m.text)) return;
+        messagesCache.push({
+          from: m.from_uid === me ? 'me' : 'seller',
+          text: m.text,
+          t: new Date(m.created_at).getTime()
+        });
+        renderBubbles();
+        loadChatList();
+      })
+      .subscribe();
+  } catch(e) { console.warn('subscribe fail', e); }
+}
+
+function renderBubbles() {
+  const box = document.getElementById('msgArea');
+  box.innerHTML = messagesCache.map(m =>
+    `<div class="bubble ${m.from==='me'?'me':''}">${escapeHtml(m.text)}<div class="meta">${timeAgo(m.t)}</div></div>`
+  ).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendMsg() {
   const inp = document.getElementById('chatInput');
   const text = inp.value.trim(); if (!text) return;
-  const c = state.chats[currentChatKey]; if (!c) return;
-  c.messages.push({from:'me', text, t: Date.now()});
+  if (!currentChatKey) return;
+  const [itemId, uid1, uid2] = currentChatKey.split('|');
+  const me = OWNER_ID;
+  const other = uid1 === me ? uid2 : uid1;
   inp.value = '';
+  // 乐观更新
+  messagesCache.push({from:'me', text, t: Date.now()});
   renderBubbles();
-  const replies = ['好的，欢迎面交～','这件商品成色确实不错。','在的，方便的话可以看看实物。','价格可以小刀。','支持担保交易更安心。'];
-  setTimeout(() => {
-    if (!state.chats[currentChatKey]) return;
-    const cc = state.chats[currentChatKey];
-    cc.messages.push({from:'seller', text: replies[Math.floor(Math.random()*replies.length)], t: Date.now()});
-    cc.last = Date.now();
-    localStorage.setItem(CHAT_KEY, JSON.stringify(state.chats));
-    renderBubbles();
-  }, 900 + Math.random()*800);
-  c.last = Date.now();
-  localStorage.setItem(CHAT_KEY, JSON.stringify(state.chats));
+  // 发送到云端
+  const { error } = await supabaseClient.from('messages').insert({
+    item_id: Number(itemId) || itemId,
+    from_uid: me,
+    to_uid: other,
+    text: text
+  });
+  if (error) {
+    toast('发送失败：' + error.message);
+  }
+  loadChatList();
 }
+
+// 旧函数保留兼容（防止其他地方调用）
+function renderChatList() { loadChatList(); }
 
 /* ============ Utils ============ */
 function fmtPrice(p) { const n = Number(p); return (Math.round(n*100)/100).toString(); }
