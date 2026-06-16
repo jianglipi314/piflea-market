@@ -401,7 +401,7 @@
   <section class="view" id="view-chats">
     <div class="section-title"><h3>消息中心</h3><span class="sub" id="chatCount"></span></div>
     <div class="chat-list" id="chatList"></div>
-    <div class="empty" id="chatEmpty">还没有消息，点进商品页联系卖家试试～</div>
+    <div class="empty" id="chatEmpty">还没有消息，点进商品页联系卖家试试～<br/><button class="btn ghost" style="margin-top:12px" onclick="checkChatTable()">检测消息表</button></div>
   </section>
 
   <section class="view" id="view-chat">
@@ -1670,6 +1670,51 @@ async function sendMsg() {
 
 // 旧函数保留兼容（防止其他地方调用）
 function renderChatList() { loadChatList(); }
+
+async function checkChatTable() {
+  if (!supabaseClient) { toast('请先等待云端连接'); return; }
+  try {
+    // 尝试查询 messages 表
+    const { error } = await supabaseClient.from('messages').select('id').limit(1);
+    if (!error) {
+      toast('✅ 消息表已就绪，可以正常聊天');
+      loadChatList();
+      return;
+    }
+    // 如果表不存在，提示用户去创建
+    toast('❌ 消息表未创建，请按以下步骤操作：');
+    setTimeout(() => {
+      const steps = `
+1. 打开 https://supabase.com/dashboard
+2. 找到 piflea-market 项目点击进入
+3. 左侧菜单点击 SQL Editor
+4. 点击 New query
+5. 粘贴下面的代码并点击 Run
+
+CREATE TABLE IF NOT EXISTS messages (
+  id BIGSERIAL PRIMARY KEY,
+  item_id BIGINT NOT NULL,
+  from_uid TEXT NOT NULL,
+  to_uid TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX messages_item_id_idx ON messages(item_id);
+CREATE INDEX messages_from_idx ON messages(from_uid);
+CREATE INDEX messages_to_idx ON messages(to_uid);
+
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "messages_all" ON messages FOR ALL USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE, DELETE ON messages TO anon, authenticated;
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+      `.trim();
+      alert(steps);
+    }, 500);
+  } catch(e) {
+    toast('检测失败：' + (e.message||''));
+  }
+}
 
 /* ============ Utils ============ */
 function fmtPrice(p) { const n = Number(p); return (Math.round(n*100)/100).toString(); }
