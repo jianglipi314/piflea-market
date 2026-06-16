@@ -253,7 +253,7 @@
 <div class="app">
 
   <div class="topbar">
-    <div class="logo">π</div>
+    <div class="logo"><svg viewBox="0 0 40 40" width="34" height="34"><circle cx="20" cy="20" r="18" fill="#2d1b4e"/><text x="20" y="26" text-anchor="middle" font-size="22" font-weight="800" fill="#f7b731" font-family="serif">π</text></svg></div>
     <button class="icon-btn" onclick="openSheet('menu')" title="菜单">☰</button>
     <div>
       <div class="top-title" id="topTitle">π 跳蚤市场</div>
@@ -387,7 +387,6 @@
       <div class="txt"><b>扫码查看商品</b><br/>云端数据 · 实时同步</div>
     </div>
     <div class="detail-fab" id="d-fab">
-      <button class="btn ghost" id="d-fav-btn" onclick="toggleFavCurrent()">⭐ 收藏</button>
       <button class="btn primary" onclick="fakeBuy()">立即购买</button>
     </div>
   </section>
@@ -428,13 +427,11 @@
     </div>
     <div class="wallet">
       <div class="cell"><div class="n" id="m-post">0</div><div class="l">我的发布</div></div>
-      <div class="cell"><div class="n" id="m-fav">0</div><div class="l">我的收藏</div></div>
       <div class="cell"><div class="n" id="m-view">0</div><div class="l">总浏览</div></div>
       <div class="cell"><div class="n" id="m-pi">100.0</div><div class="l">钱包 π</div></div>
     </div>
     <div class="tabs">
       <button class="tab on" id="tab-post" onclick="switchMine('post')">我的发布</button>
-      <button class="tab" id="tab-fav" onclick="switchMine('fav')">我的收藏</button>
       <button class="tab" id="tab-hist" onclick="switchMine('hist')">浏览记录</button>
     </div>
     <div id="mineLoader" class="loading" style="display:none">加载中...</div>
@@ -453,7 +450,6 @@
     <div class="section-title"><h3>运营后台</h3><span class="sub" onclick="goto('mine')">返回 ›</span></div>
     <div class="stat-grid">
       <div class="stat"><div class="n" id="a-items">0</div><div class="l">商品数</div></div>
-      <div class="stat"><div class="n" id="a-fav">0</div><div class="l">收藏数</div></div>
       <div class="stat"><div class="n" id="a-view">0</div><div class="l">总浏览</div></div>
       <div class="stat"><div class="n" id="a-chat">0</div><div class="l">对话数</div></div>
     </div>
@@ -812,7 +808,7 @@ function recoHTML(it) {
     <div class="body">
       <p class="t">${escapeHtml(it.title)}</p>
       <div class="p">${fmtPrice(it.price)} <small style="color:var(--ink-2)">π</small></div>
-      <div class="meta"><span>${escapeHtml(it.seller||'')}</span><span>⭐ ${it.fav||0} · 👁 ${it.views||0}</span></div>
+      <div class="meta"><span>${escapeHtml(it.seller||'')}</span><span>👁 ${it.views||0}</span></div>
     </div>
   </div>`;
 }
@@ -825,7 +821,6 @@ function cardHTML(it) {
     <div class="pic">
       ${it.images && it.images[0] ? `<img src="${it.images[0]}" loading="lazy" decoding="async" onerror="this.style.display='none'"/>` : it.emoji}
       ${badges.join('')}
-      <button class="fav ${isFav(it.id)?'on':''}" onclick="event.stopPropagation();toggleFav(${it.id},this)">${isFav(it.id)?'★':'☆'}</button>
     </div>
     <div class="info">
       <p class="title">${escapeHtml(it.title)}</p>
@@ -836,18 +831,12 @@ function cardHTML(it) {
       <div class="seller">
         <div class="avatar">${(it.seller||'U').slice(0,1)}</div>
         <span>${escapeHtml(it.seller||'卖家')}</span>
-        <span class="fav-count">⭐ ${it.fav||0} · 👁 ${it.views||0}</span>
+        <span class="fav-count">👁 ${it.views||0}</span>
       </div>
     </div>
   </div>`;
 }
-
-function isFav(id) {
-  const stored = JSON.parse(localStorage.getItem('pi_flea_favs')||'[]');
-  return stored.includes(String(id));
-}
-
-/* ============ Detail ============ */
+// ============ Detail ============
 let heroImgIdx = 0;
 async function openDetail(id) {
   const it = state.items.find(x => x.id === id);
@@ -891,7 +880,6 @@ async function openDetail(id) {
   }
   document.getElementById('d-meta').innerHTML = [
     `<span>🏷 ${it.cat}</span>`,
-    `<span>⭐ ${it.fav||0} 收藏</span>`,
     `<span>👁 ${it.views||0} 浏览</span>`,
     `<span>🕓 ${timeAgo(it.createdAt)}</span>`,
     `<span>#${it.id}</span>`
@@ -922,47 +910,9 @@ async function openDetail(id) {
     dots.querySelectorAll('span').forEach((s,i) => s.classList.toggle('on', i === heroImgIdx));
   };
 
-  const favOn = isFav(id);
-  document.getElementById('d-fav-btn').textContent = favOn ? '⭐ 已收藏' : '☆ 收藏';
   document.getElementById('d-fab').style.display = 'flex';
   drawFakeQR(id);
   window.scrollTo({top:0, behavior:'instant'});
-}
-
-function toggleFavCurrent() {
-  const id = state.currentDetailId;
-  const it = state.items.find(x => x.id === id);
-  const stored = JSON.parse(localStorage.getItem('pi_flea_favs')||'[]');
-  const idx = stored.indexOf(String(id));
-  if (idx >= 0) {
-    stored.splice(idx, 1);
-    toast('已取消收藏');
-    if (it) it.fav = Math.max(0, (it.fav||0)-1);
-  } else {
-    stored.push(String(id));
-    toast('已收藏');
-    if (it) it.fav = (it.fav||0) + 1;
-  }
-  localStorage.setItem('pi_flea_favs', JSON.stringify(stored));
-  openDetail(id);
-}
-
-function toggleFav(id, el) {
-  const it = state.items.find(x => x.id === id);
-  const stored = JSON.parse(localStorage.getItem('pi_flea_favs')||'[]');
-  const idx = stored.indexOf(String(id));
-  if (idx >= 0) {
-    stored.splice(idx, 1);
-    toast('已取消收藏');
-    if (it) it.fav = Math.max(0, (it.fav||0)-1);
-    if (el) { el.classList.remove('on'); el.textContent = '☆'; }
-  } else {
-    stored.push(String(id));
-    toast('已收藏');
-    if (it) it.fav = (it.fav||0) + 1;
-    if (el) { el.classList.add('on'); el.textContent = '★'; }
-  }
-  localStorage.setItem('pi_flea_favs', JSON.stringify(stored));
 }
 
 function fakeBuy() {
@@ -1206,7 +1156,6 @@ function editMyName() {
 function switchMine(t) {
   state.mineTab = t;
   document.getElementById('tab-post').classList.toggle('on', t === 'post');
-  document.getElementById('tab-fav').classList.toggle('on', t === 'fav');
   document.getElementById('tab-hist').classList.toggle('on', t === 'hist');
   renderMine();
 }
@@ -1229,14 +1178,11 @@ async function renderMine() {
       return false;
     });
     document.getElementById('m-post').textContent = myItems.length;
-    const favStored = JSON.parse(localStorage.getItem('pi_flea_favs')||'[]');
-    document.getElementById('m-fav').textContent = favStored.length;
     document.getElementById('m-view').textContent = myItems.reduce((a,b)=>a+(b.views||0),0);
     document.getElementById('s-city').textContent = state.city || '未设置';
 
     let items = [];
     if (state.mineTab === 'post') items = myItems;
-    else if (state.mineTab === 'fav') items = state.items.filter(i => favStored.includes(String(i.id)));
     else {
       const ids = state.history.map(h => h.id);
       items = ids.map(id => state.items.find(i => i.id === id)).filter(Boolean);
@@ -1246,7 +1192,7 @@ async function renderMine() {
     if (state.mineTab==='post' && !meName) {
       empty.textContent = '还没有发布过商品，去发布一个吧～';
     } else {
-      empty.textContent = state.mineTab==='post'?'还没有发布过商品':'暂无收藏，逛首页挑一挑～';
+      empty.textContent = state.mineTab==='post'?'还没有发布过商品':'暂无浏览记录';
     }
     empty.style.display = items.length ? 'none' : 'block';
     document.getElementById('mine-list').innerHTML = items.map(it =>
@@ -1255,10 +1201,9 @@ async function renderMine() {
         <div class="txt" onclick="openDetail(${it.id})">
           <h4>${escapeHtml(it.title)}</h4>
           <div class="price">${fmtPrice(it.price)} π</div>
-          <div class="sub">${it.cat} · ${timeAgo(it.createdAt)} · ⭐ ${it.fav||0} · 👁 ${it.views||0}</div>
+          <div class="sub">${it.cat} · ${timeAgo(it.createdAt)} · 👁 ${it.views||0}</div>
         </div>
         ${state.mineTab==='post'?`<button class="rm" onclick="removeMine(${it.id})">下架</button>`:''}
-        ${state.mineTab==='fav'?`<span class="mini">✓ 已收藏</span>`:''}
       </div>`
     ).join('');
   } catch(e) {
@@ -1317,8 +1262,6 @@ async function renderAdmin() {
       createdAt: new Date(d.created_at).getTime()
     }));
     document.getElementById('a-items').textContent = allItems.length;
-    const favStored = JSON.parse(localStorage.getItem('pi_flea_favs')||'[]');
-    document.getElementById('a-fav').textContent = favStored.length;
     document.getElementById('a-view').textContent = allItems.reduce((a,b)=>a+(b.views||0),0);
     document.getElementById('a-chat').textContent = Object.keys(state.chats).length;
     document.getElementById('adminLoader').style.display = 'none';
@@ -1328,7 +1271,7 @@ async function renderAdmin() {
         <div class="txt" onclick="openDetail(${it.id})">
           <h4>${escapeHtml(it.title)}</h4>
           <div class="price">${fmtPrice(it.price)} π</div>
-          <div class="sub">${it.cat} · ⭐ ${it.fav||0} · 👁 ${it.views||0}</div>
+          <div class="sub">${it.cat} · 👁 ${it.views||0}</div>
         </div>
         <button class="rm" style="color:var(--brand);border-color:#ffd6c5" onclick="toggleRecoAdmin(${it.id})">${it.tpl==='reco'?'取消推荐':'设为推荐'}</button>
       </div>`
