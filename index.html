@@ -37,7 +37,7 @@
   .topbar{position:sticky;top:0;z-index:30;background:linear-gradient(180deg,var(--card) 70%,rgba(255,255,255,.55));
     padding:12px 14px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);backdrop-filter:saturate(140%) blur(6px)}
   html[data-dark="1"] .topbar{background:linear-gradient(180deg,var(--card) 70%,rgba(24,28,46,.6))}
-  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;display:grid;place-items:center;box-shadow:var(--shadow)}
+  .logo{width:36px;height:36px;border-radius:10px;background:none;display:grid;place-items:center;box-shadow:var(--shadow)}
   .top-title{font-weight:700;font-size:16px;letter-spacing:.3px}
   .top-sub{font-size:12px;color:var(--ink-2);margin-top:-1px}
   .search{margin-left:auto;background:#f1f3f9;border-radius:999px;padding:8px 12px;display:flex;align-items:center;gap:6px;color:var(--ink-2);font-size:13px;min-width:140px}
@@ -253,7 +253,7 @@
 <div class="app">
 
   <div class="topbar">
-    <div class="logo"><svg viewBox="0 0 120 120" width="36" height="36"><circle cx="60" cy="60" r="58" fill="#5c2b91"/><ellipse cx="60" cy="32" rx="18" ry="12" fill="#7c3aed"/><path d="M42 40 Q42 22 60 22 Q78 22 78 40 L82 80 Q82 84 78 84 L42 84 Q38 84 38 80 Z" fill="#8b5cf6"/><path d="M60 40 L60 22" stroke="#8b5cf6" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="50" cy="46" r="2.5" fill="#5c2b91"/><circle cx="70" cy="46" r="2.5" fill="#5c2b91"/><path d="M52 52 Q44 52 44 68 Q44 76 50 76" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 52 Q76 52 76 68 Q76 76 70 76" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M50 52 L70 52" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/></svg></div>
+    <div class="logo"><svg viewBox="0 0 64 64" width="36" height="36"><defs><linearGradient id="piGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#7c3aed"/><stop offset="100%" style="stop-color:#4c1d95"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#piGrad)"/><path d="M46 28 L46 36 L38 36 L38 46 C38 49 35 52 32 52 C29 52 26 49 26 46 L26 36 L18 36 L18 28 L26 28 L26 22 C26 19 29 16 32 16 C35 16 38 19 38 22 L38 28 Z" fill="#fff"/></svg></div>
     <button class="icon-btn" onclick="openSheet('menu')" title="菜单">☰</button>
     <div>
       <div class="top-title" id="topTitle">π 跳蚤市场</div>
