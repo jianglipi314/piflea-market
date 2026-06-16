@@ -173,6 +173,12 @@
   .list .row-item .rm{color:#b91c1c;font-size:12px;background:transparent;border:1px solid #fecaca;padding:8px 12px;border-radius:999px;margin-left:8px;cursor:pointer;border:none}
   html[data-dark="1"] .list .row-item .rm{color:#fca5a5;border-color:#4a2a2a}
   .list .row-item .mini{font-size:12px;color:var(--ok)}
+  .list .row-item .row-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .list .row-item .edit-btn{color:var(--accent);font-size:12px;background:transparent;border:1px solid #dbe4ff;padding:8px 12px;border-radius:999px;cursor:pointer;min-height:36px}
+  html[data-dark="1"] .list .row-item .edit-btn{color:#9ab3ff;border-color:#3a4a7a}
+  .thumb.uploaded{position:relative;padding:0;background:#f5f5f5;overflow:hidden}
+  .thumb.uploaded img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb.uploaded .x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:14px;line-height:1;cursor:pointer}
   .empty{text-align:center;color:var(--ink-2);padding:30px 0;font-size:13px}
   .loading{text-align:center;color:var(--ink-2);padding:40px 0;font-size:14px}
   .loading::after{content:'';display:inline-block;width:16px;height:16px;border:2px solid var(--brand);border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:6px}
@@ -619,6 +625,7 @@ const state = {
   adminClicks: parseInt(localStorage.getItem(ADMIN_CLICK_KEY)||'0'),
   city: localStorage.getItem(LOC_KEY)||'',
   uploading: false,
+  editId: null, // 编辑模式标记
 };
 
 /* ============ Toast ============ */
@@ -954,6 +961,11 @@ function clearForm() {
   // 自动回填上次的昵称
   const me = localStorage.getItem('pi_flea_me');
   if (me) document.getElementById('f-seller').value = me;
+  // 恢复按钮文字
+  const submitBtn = document.getElementById('f-submit');
+  if (submitBtn) submitBtn.textContent = '免费发布';
+  // 重置编辑标记
+  state.editId = null;
 }
 
 function setStep(n) {
@@ -1117,28 +1129,110 @@ async function doPublish(ev) {
 
 async function submitItem(data) {
   const btn = document.getElementById('f-submit');
-  btn.textContent = '保存到云端...';
-  const { data: inserted, error } = await supabaseClient.from('items').insert({
-    title: data.title, price: data.price, category: data.cat,
-    description: data.desc, seller: data.seller, city: data.city,
-    contact: data.contact || '',
-    images: data.images, views: 0, fav_count: 0,
-    owner_id: data.owner_id
-  }).select().single();
+  const isEdit = !!state.editId;
+  btn.textContent = isEdit ? '保存修改中...' : '保存到云端...';
+
+  let result, error;
+  if (isEdit) {
+    // 更新已有商品
+    ({ data: result, error } = await supabaseClient.from('items').update({
+      title: data.title, price: data.price, category: data.cat,
+      description: data.desc, seller: data.seller, city: data.city,
+      contact: data.contact || '',
+      images: data.images,
+    }).eq('id', state.editId).select().single());
+  } else {
+    // 新发布
+    ({ data: result, error } = await supabaseClient.from('items').insert({
+      title: data.title, price: data.price, category: data.cat,
+      description: data.desc, seller: data.seller, city: data.city,
+      contact: data.contact || '',
+      images: data.images, views: 0, fav_count: 0,
+      owner_id: data.owner_id
+    }).select().single());
+  }
+
   if (error) {
     toast('保存失败：' + error.message);
     btn.disabled = false;
-    btn.textContent = '免费发布';
+    btn.textContent = isEdit ? '保存修改' : '免费发布';
     state.uploading = false;
     return;
   }
-  toast('✅ 发布成功！商品已同步到云端');
+  toast(isEdit ? '✅ 修改成功' : '✅ 发布成功！商品已同步到云端');
   setStep(3);
+  const editIdBackup = state.editId;
+  state.editId = null;
   clearForm();
-  setTimeout(() => goto('mine'), 800);
+  setTimeout(() => {
+    loadItems();
+    goto('mine');
+  }, 800);
   btn.disabled = false;
   btn.textContent = '免费发布';
   state.uploading = false;
+}
+
+/* ============ Edit Item ============ */
+async function openEdit(id) {
+  const it = state.items.find(x => x.id === id);
+  if (!it) { toast('商品不存在'); return; }
+  // 权限校验
+  const isMine = it.owner_id
+    ? (it.owner_id === OWNER_ID)
+    : ((it.seller||'') === (localStorage.getItem('pi_flea_me')||''));
+  if (!isMine) { toast('无权编辑此商品'); return; }
+
+  // 标记为编辑模式
+  state.editId = id;
+
+  // 跳转到发布页
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-publish').classList.add('active');
+  document.getElementById('topTitle').textContent = '编辑商品';
+  document.getElementById('topSub').textContent = '修改信息后保存';
+
+  // 填充表单
+  document.getElementById('f-title').value = it.title || '';
+  document.getElementById('f-cat').value = it.cat || '数码';
+  document.getElementById('f-price').value = it.price || '';
+  document.getElementById('f-city').value = it.city || '';
+  document.getElementById('f-desc').value = it.desc || '';
+  document.getElementById('f-seller').value = it.seller || '';
+  document.getElementById('f-contact').value = it.contact || '';
+
+  // 填充图片（已上传的URL）
+  uploadImages = (it.images || []).slice();
+  const uploader = document.getElementById('uploader');
+  // 清空除+号外的预览
+  Array.from(uploader.querySelectorAll('.thumb.preview, .thumb.uploaded')).forEach(el => el.remove());
+  uploadImages.forEach((url, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'thumb uploaded';
+    btn.dataset.url = url;
+    btn.innerHTML = `<img src="${url}" /><span class="x" onclick="event.stopPropagation();removeUploadedImage(${i}, this)">×</span>`;
+    uploader.insertBefore(btn, uploader.firstChild);
+  });
+  document.getElementById('uploadHint').textContent = `已加载 ${uploadImages.length} 张图片，可继续添加或删除`;
+
+  // 修改按钮文字
+  document.getElementById('f-submit').textContent = '保存修改';
+  setStep(1);
+  document.getElementById('preview').style.display = 'none';
+  window.scrollTo({top:0, behavior:'instant'});
+}
+
+function removeUploadedImage(idx, el) {
+  uploadImages.splice(idx, 1);
+  el.parentElement.remove();
+  // 重新渲染所有图片的删除索引
+  const uploader = document.getElementById('uploader');
+  Array.from(uploader.querySelectorAll('.thumb.uploaded')).forEach((btn, i) => {
+    const x = btn.querySelector('.x');
+    if (x) x.setAttribute('onclick', `event.stopPropagation();removeUploadedImage(${i}, this)`);
+  });
+  document.getElementById('uploadHint').textContent = `已加载 ${uploadImages.length} 张图片`;
 }
 
 /* ============ Mine ============ */
@@ -1203,7 +1297,7 @@ async function renderMine() {
           <div class="price">${fmtPrice(it.price)} π</div>
           <div class="sub">${it.cat} · ${timeAgo(it.createdAt)} · 👁 ${it.views||0}</div>
         </div>
-        ${state.mineTab==='post'?`<button class="rm" onclick="removeMine(${it.id})">下架</button>`:''}
+        ${state.mineTab==='post'?`<div class="row-actions"><button class="edit-btn" onclick="event.stopPropagation();openEdit(${it.id})">编辑</button><button class="rm" onclick="event.stopPropagation();removeMine(${it.id})">下架</button></div>`:''}
       </div>`
     ).join('');
   } catch(e) {
