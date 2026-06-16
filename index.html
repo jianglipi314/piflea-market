@@ -446,7 +446,7 @@
     <div class="setting">
       <div class="srow"><div class="lb">📍 默认位置</div><div class="val" id="s-city">未设置</div></div>
       <div class="srow"><div class="lb">🌙 深色模式</div><div class="toggle" id="darkToggle" onclick="toggleDark()"></div></div>
-      <div class="srow"><div class="lb">🪙 Pi 账号</div><button class="btn ghost" id="piAuthBtn" onclick="piLogin()">Pi 登录</button></div>
+      <div class="srow"><div class="lb">🪙 Pi 账号</div><button class="btn ghost" id="piAuthBtn" onclick="piLogin()" style="opacity:.6">检测中...</button></div>
       <div class="srow"><div class="lb">📤 导出数据</div><button class="btn ghost" onclick="exportData()">导出本地副本</button></div>
     </div>
     <div class="empty" style="padding:18px 0 60px;cursor:pointer" onclick="toggleAdmin()"><span id="adminToggleHint">· 点击开启运营面板（5 次） ·</span></div>
@@ -574,49 +574,101 @@ function createRestSupabaseClient(url, key) {
 const PLATFORM_WALLET = 'A-pi_wallet_for_piflea_market_platform_fee';
 const PI_USER_KEY = 'pi_flea_pi_user_v1';
 let PiIsAvailable = false;
-let piUser = null; // 当前Pi登录的用户
+let piUser = null;
 
 function initPiAndAuthenticate() {
-  if (typeof window.Pi !== 'undefined') {
-    window.Pi.init({ version: "2.0", sandbox: false }).then(function(api) {
-      PiIsAvailable = true;
-      // 尝试静默登录已存在的会话
-      const cached = localStorage.getItem(PI_USER_KEY);
-      if (cached) {
-        try { piUser = JSON.parse(cached); applyPiUser(); } catch(e){}
-      }
-      // 真正发起authenticate获取最新用户信息
-      authenticateWithPi(api);
-    }).catch(function() { PiIsAvailable = false; });
+  // 检测是否在Pi浏览器中
+  const isPiBrowser = typeof window.Pi !== 'undefined';
+  
+  if (isPiBrowser) {
+    // Pi SDK 2.0 初始化 - 使用正确的sandbox配置
+    // 生产环境用 false，测试环境用 true
+    const isSandbox = window.location.hostname.includes('github.io') === false && 
+                      window.location.hostname !== 'jianglipi314.github.io';
+    
+    window.Pi.init({ version: "2.0", sandbox: isSandbox })
+      .then(function() {
+        PiIsAvailable = true;
+        updatePiButtonState();
+        
+        // 尝试恢复已登录用户
+        const cached = localStorage.getItem(PI_USER_KEY);
+        if (cached) {
+          try { 
+            piUser = JSON.parse(cached); 
+            applyPiUser(); 
+          } catch(e){}
+        }
+      })
+      .catch(function(err) {
+        console.error('Pi init failed:', err);
+        PiIsAvailable = false;
+        updatePiButtonState();
+      });
   } else {
-    // Pi SDK未加载（普通浏览器），3秒后允许手动登录
-    setTimeout(() => { PiIsAvailable = false; }, 3000);
+    // 普通浏览器
+    PiIsAvailable = false;
+    updatePiButtonState();
   }
 }
 
-function authenticateWithPi(api) {
-  if (!api) api = window.Pi;
-  if (!api) return;
-  const scopes = ['username', 'payments'];
-  api.authenticate(scopes, function(auth) {
-    // auth.user 包含 uid, username
-    piUser = {
-      uid: auth.user.uid,
-      username: auth.user.username,
-      accessToken: auth.accessToken
+function updatePiButtonState() {
+  const btn = document.getElementById('piAuthBtn');
+  if (!btn) return;
+  
+  if (piUser) {
+    // 已登录
+    btn.textContent = '已登录: @' + piUser.username;
+    btn.style.opacity = '1';
+    btn.onclick = piLogout;
+  } else if (PiIsAvailable) {
+    // 在Pi浏览器中，未登录
+    btn.textContent = 'Pi 登录';
+    btn.style.opacity = '1';
+    btn.onclick = piLogin;
+  } else {
+    // 普通浏览器
+    btn.textContent = '请在Pi浏览器登录';
+    btn.style.opacity = '.5';
+    btn.onclick = function() {
+      toast('请下载 Pi Browser App 访问本网站');
     };
-    localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
-    applyPiUser();
-    toast('✅ Pi 登录成功：' + piUser.username);
-  }, function(err) {
-    console.log('Pi auth error', err);
-    // 不强制要求登录，普通浏览不受影响
+  }
+}
+
+function authenticateWithPi() {
+  if (!window.Pi) {
+    toast('Pi SDK 不可用');
+    return;
+  }
+  
+  // Pi SDK 2.0 authenticate 用法
+  const scopes = ['username', 'payments'];
+  
+  window.Pi.authenticate(scopes, function(authResult) {
+    // 登录成功回调
+    if (authResult && authResult.user) {
+      piUser = {
+        uid: authResult.user.uid,
+        username: authResult.user.username,
+        accessToken: authResult.accessToken
+      };
+      localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
+      applyPiUser();
+      updatePiButtonState();
+      toast('✅ Pi 登录成功：@' + piUser.username);
+    }
+  }, function(error) {
+    // 登录失败或取消回调
+    console.error('Pi auth error:', error);
+    if (error && error.message) {
+      toast('登录失败：' + error.message);
+    }
   });
 }
 
 function applyPiUser() {
   if (!piUser) return;
-  // 更新"我的"页面头像/昵称
   const av = document.getElementById('m-avatar');
   const nm = document.getElementById('m-name');
   const id = document.getElementById('m-id');
@@ -637,7 +689,6 @@ function piLogout() {
   if (!confirm('确定要退出 Pi 登录吗？')) return;
   piUser = null;
   localStorage.removeItem(PI_USER_KEY);
-  // 恢复本地显示
   const me = localStorage.getItem('pi_flea_me') || '本地用户';
   document.getElementById('m-name').textContent = me;
   document.getElementById('m-avatar').textContent = me.slice(0, 1);
@@ -645,6 +696,7 @@ function piLogout() {
   if (window.Pi && window.Pi.logout) {
     try { window.Pi.logout(); } catch(e){}
   }
+  updatePiButtonState();
   toast('已退出 Pi 登录');
 }
 
