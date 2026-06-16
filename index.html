@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>π 跳蚤市场 · 先锋二手</title>
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <script src="https://sdk.minepi.com/pi-sdk.js" onerror="window.piSdkLoadFailed=true"></script>
   <style>
   :root{
     --bg:#f4f5f9;
@@ -577,13 +577,11 @@ let PiIsAvailable = false;
 let piUser = null;
 
 function initPiAndAuthenticate() {
-  // 检测是否在Pi浏览器中
-  const isPiBrowser = typeof window.Pi !== 'undefined';
+  // 检测是否在Pi浏览器中（Pi浏览器会自动注入window.Pi）
+  const isPiBrowser = typeof window.Pi !== 'undefined' && !window.piSdkLoadFailed;
   
   if (isPiBrowser) {
     // Pi SDK 2.0 初始化
-    // GitHub Pages是测试环境，用sandbox: true
-    // 正式上线域名用sandbox: false
     const isSandbox = window.location.hostname.includes('github.io') || 
                       window.location.hostname === 'localhost' ||
                       window.location.hostname === '127.0.0.1';
@@ -608,9 +606,10 @@ function initPiAndAuthenticate() {
         updatePiButtonState();
       });
   } else {
-    // 普通浏览器
+    // 普通浏览器或SDK加载失败
     PiIsAvailable = false;
-    updatePiButtonState();
+    // 延迟更新按钮，确保DOM已加载
+    setTimeout(updatePiButtonState, 100);
   }
 }
 
