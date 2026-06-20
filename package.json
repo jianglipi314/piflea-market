@@ -5,10 +5,10 @@
   "description": "π 跳蚤市场 — Pi Network 生态二手交易平台",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:prod": "vite build --mode production",
-    "preview": "vite preview"
+    "dev": "npx vite",
+    "build": "npx vite build",
+    "build:prod": "npx vite build --mode production",
+    "preview": "npx vite preview"
   },
   "devDependencies": {
     "vite": "^6.0.0"
