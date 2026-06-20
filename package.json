@@ -1,0 +1,19 @@
+{
+  "name": "piflea-market",
+  "private": true,
+  "version": "0.2.0",
+  "description": "π 跳蚤市场 — Pi Network 生态二手交易平台",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:prod": "vite build --mode production",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
