@@ -82,20 +82,33 @@ export function openOrder(id) {
  * Confirm payment — called from the button.
  */
 export async function confirmPayment() {
-  if (!currentOrderItem) { toast('订单信息丢失'); return; }
+  console.log('[Payment] confirmPayment called');
+  
+  if (!currentOrderItem) { 
+    console.log('[Payment] Error: currentOrderItem is null');
+    toast('订单信息丢失，请重新选择商品'); 
+    goto('home');
+    return; 
+  }
 
-  // Check Pi SDK availability and authentication
+  console.log('[Payment] Current order item:', currentOrderItem.id, currentOrderItem.title);
+
   if (!window.Pi) {
+    console.log('[Payment] Error: window.Pi is not available');
     toast('Pi SDK 不可用，请在 Pi Browser 中打开');
     return;
   }
 
-  // Ensure the user is authenticated for payment
+  console.log('[Payment] Pi SDK is available');
+
   if (!isPiAuthenticated()) {
+    console.log('[Payment] Error: User not authenticated');
     toast('请先在个人中心点击 Pi 登录');
     goto('mine');
     return;
   }
+
+  console.log('[Payment] User is authenticated');
 
   const btn = document.getElementById('o-confirm-btn');
   btn.disabled = true;
@@ -105,17 +118,31 @@ export async function confirmPayment() {
   const platformFee = FEE_MODE === 'A' ? 0 : (FEE_MODE === 'B' ? price * PLATFORM_FEE_RATE : 0);
   const total = price + platformFee + NETWORK_FEE;
 
-  // createPayment 是同步方法，直接调用即可，结果由 callbacks 通知
-  createPiPayment(
-    total,
-    'Piflea: ' + currentOrderItem.title,
-    {
-      itemId: currentOrderItem.id,
-      seller: currentOrderItem.seller,
-      mode: FEE_MODE,
-    }
-  );
-  // 按钮状态由 Pi SDK 回调中的 toast 通知，这里立即恢复
-  btn.disabled = false;
-  btn.textContent = '确认支付 ' + fmtPrice(total) + ' π';
+  console.log('[Payment] Creating payment, amount:', total, 'memo:', 'Piflea: ' + currentOrderItem.title);
+
+  try {
+    createPiPayment(
+      total,
+      'Piflea: ' + currentOrderItem.title,
+      {
+        itemId: currentOrderItem.id,
+        seller: currentOrderItem.seller,
+        mode: FEE_MODE,
+      },
+      (success) => {
+        btn.disabled = false;
+        btn.textContent = '确认支付 ' + fmtPrice(total) + ' π';
+        if (success) {
+          goto('mine');
+        }
+      }
+    );
+    console.log('[Payment] createPiPayment called successfully');
+  } catch (e) {
+    console.error('[Payment] createPiPayment threw error:', e);
+    toast('支付调用失败：' + e.message);
+    btn.disabled = false;
+    btn.textContent = '确认支付 ' + fmtPrice(total) + ' π';
+    return;
+  }
 }

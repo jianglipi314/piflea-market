@@ -6,7 +6,7 @@ import './styles/components.css';
 import './styles/views.css';
 
 import { createState } from './state';
-import { getOwnerId, toast } from './utils';
+import { getOwnerId, toast, getAllMyUserIds } from './utils';
 import { getSupabase } from './supabase';
 import { initPiAndAuthenticate } from './pi-sdk';
 import { initNav, goto } from './router';

@@ -141,32 +141,55 @@ export function getPiUser() {
  * Create a Pi payment.
  * createPayment 是同步方法，不返回 Promise，通过 callbacks 通知结果
  */
-export function createPiPayment(amount, memo, metadata = {}) {
+export function createPiPayment(amount, memo, metadata = {}, onComplete) {
+  console.log('[Pi SDK] createPiPayment called with amount:', amount);
+  
   if (!window.Pi) {
+    console.error('[Pi SDK] Error: window.Pi is undefined');
     toast('Pi SDK 不可用');
+    if (onComplete) onComplete(false, 'Pi SDK 不可用');
     return;
   }
+  
+  console.log('[Pi SDK] window.Pi exists:', !!window.Pi);
+  
   if (typeof window.Pi.createPayment !== 'function') {
+    console.error('[Pi SDK] Error: window.Pi.createPayment is not a function');
     toast('Pi SDK createPayment 不可用');
+    if (onComplete) onComplete(false, 'Pi SDK createPayment 不可用');
     return;
   }
+  
+  console.log('[Pi SDK] window.Pi.createPayment is available');
+  
   if (!piUser) {
+    console.error('[Pi SDK] Error: piUser is null, user not logged in');
     toast('请先登录 Pi 账号');
+    if (onComplete) onComplete(false, '请先登录 Pi 账号');
     return;
   }
+  
+  console.log('[Pi SDK] User is logged in:', piUser.username);
 
-  // 确保 init 完成再调 createPayment
+  const resetButton = () => {
+    if (onComplete) onComplete(true);
+  };
+
   ensureInit().then(() => {
+    console.log('[Pi SDK] Pi.init() completed, creating payment...');
+    
     const paymentData = {
       amount: String(amount),
       memo: memo || 'Piflea payment',
       metadata: { app: 'piflea-market', ...metadata },
       uid: piUser.uid,
     };
+    
+    console.log('[Pi SDK] Payment data:', JSON.stringify(paymentData));
 
     window.Pi.createPayment(paymentData, {
       onReadyForServerApproval: function (paymentId) {
-        console.log('approval:', paymentId);
+        console.log('[Pi SDK] onReadyForServerApproval:', paymentId);
         toast('支付等待确认');
         fetch(BACKEND_URL + '/api/approve', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -174,21 +197,30 @@ export function createPiPayment(amount, memo, metadata = {}) {
         }).catch(e => console.error('approve err:', e));
       },
       onReadyForServerCompletion: function (paymentId, txid) {
-        console.log('complete:', paymentId, txid);
+        console.log('[Pi SDK] onReadyForServerCompletion:', paymentId, txid);
         toast('✅ 支付完成！');
         fetch(BACKEND_URL + '/api/complete', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ paymentId, txid }),
         }).catch(e => console.error('complete err:', e));
+        resetButton();
       },
       onCancel: function (paymentId) {
-        console.log('cancelled:', paymentId);
+        console.log('[Pi SDK] onCancel:', paymentId);
         toast('支付已取消');
+        resetButton();
       },
       onError: function (error, payment) {
-        console.error('pay error:', error, payment);
+        console.error('[Pi SDK] onError:', error, payment);
         toast('支付失败：' + (error?.message || '未知错误'));
+        resetButton();
       },
     });
+    
+    console.log('[Pi SDK] createPayment called successfully');
+  }).catch(e => {
+    console.error('[Pi SDK] ensureInit error:', e);
+    toast('Pi SDK 初始化失败：' + e.message);
+    if (onComplete) onComplete(false, 'Pi SDK 初始化失败');
   });
 }
