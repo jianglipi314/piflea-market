@@ -651,6 +651,30 @@
 .setting .srow .lb { flex: 1; }
 .setting .srow .val { color: var(--ink-2); font-size: 13px; }
 
+/* Settings Links */
+.setting-links {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-top: 12px;
+  padding: 0 14px;
+}
+
+.setting-links .srow.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.setting-links .srow.link:active { transform: scale(0.985); opacity: 0.86; }
+.setting-links .srow.link:last-child { border-bottom: 0; }
+.setting-links .srow.link .lb { flex: 1; }
+.setting-links .srow.link .arrow { color: var(--ink-2); font-size: 18px; }
+
 /* Stats */
 .stat-grid {
   display: grid;

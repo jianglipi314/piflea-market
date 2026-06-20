@@ -40,6 +40,20 @@ export function openSheet(kind) {
           `<button class="btn ghost" onclick="toast('已提交：${t}');closeSheet()">${t}</button>`
       )
       .join('');
+  } else if (kind === 'feedback') {
+    title.textContent = '帮助与反馈';
+    body.innerHTML = `
+      <div style="margin-bottom:12px">
+        <b>常见问题</b><br/>
+        · 如何发布商品？点击底部「发布」按钮<br/>
+        · 如何联系卖家？进入商品详情点击「联系卖家」<br/>
+        · 支付安全吗？平台担保交易，确认收货后才付款
+      </div>
+      <div style="margin-bottom:12px">
+        <b>联系我们</b><br/>
+        邮箱：support@piflea.com
+      </div>`;
+    acts.innerHTML = `<button class="btn ghost" onclick="closeSheet()">关闭</button>`;
   }
 
   box.classList.add('on');

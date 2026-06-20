@@ -41,7 +41,7 @@ export function cardHTML(it) {
     <div class="info">
       <p class="title">${escapeHtml(it.title)}</p>
       <div class="price-row">
-        <div class="price">${fmtPrice(it.price)}<small> π</small></div>
+        <div class="price">${fmtPrice(it.price)} π</div>
         <div style="font-size:11px;color:var(--ink-2)">${it.cat}</div>
       </div>
       <div class="seller">

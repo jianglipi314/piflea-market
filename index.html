@@ -6,9 +6,44 @@
   <title>π 跳蚤市场 · 先锋二手</title>
   <!-- 同步加载，确保 main.js 执行时 window.Pi 已就绪 -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <style>
+    .debug-panel {
+      position: fixed;
+      bottom: 60px;
+      left: 10px;
+      right: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.85);
+      color: #0f0;
+      font-size: 11px;
+      font-family: monospace;
+      padding: 8px;
+      border-radius: 8px;
+      z-index: 9999;
+      display: none;
+    }
+    .debug-panel.show { display: block; }
+    .debug-panel .log { margin: 2px 0; word-break: break-all; }
+    .debug-panel .err { color: #f55; }
+    .debug-toggle {
+      position: fixed;
+      bottom: 60px;
+      right: 10px;
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      z-index: 9998;
+    }
+  </style>
 </head>
 <body>
 <div class="app">
+  <button class="debug-toggle" onclick="toggleDebug()">调试</button>
+  <div class="debug-panel" id="debugPanel"></div>
 
   <!-- Topbar -->
   <div class="topbar">
@@ -30,12 +65,10 @@
       <button class="cta" onclick="goto('publish')">立即发布 →</button>
     </div>
     <div class="quick" id="quick"></div>
-    <div class="section-title"><h3>今日推荐</h3><span class="sub" id="recoCount"></span></div>
-    <div class="recos" id="recos"></div>
     <div class="section-title"><h3>分类浏览</h3><span class="sub" id="catTip">全部</span></div>
     <div class="cats" id="cats"></div>
     <div class="sortbar" id="sortbar"></div>
-    <div class="section-title"><h3 id="listTitle">最新发布</h3><button class="sub" id="toggleReco" onclick="toggleReco()">只看推荐</button></div>
+    <div class="section-title"><h3 id="listTitle">发现好物</h3></div>
     <div id="listLoader" class="loading">加载中...</div>
     <div class="grid" id="list"></div>
     <div class="empty" id="empty" style="display:none">暂无商品，去发一个试试～</div>
@@ -61,11 +94,8 @@
       <div class="step" data-step="2">② 预览</div>
       <div class="step" data-step="3">③ 完成</div>
     </div>
-    <div class="rules">
-      <b>📌 上架规则</b><br/>
-      · 现在支持 <b>免费发布</b>，无需任何发布费用<br/>
-      · 商品图片最多上传 <b>6 张</b>，需真实上传到云端存储<br/>
-      · 所有商品云端同步，所有用户可见
+    <div class="rules" style="font-size:12px;color:var(--ink-2);padding:8px 12px;line-height:1.4">
+      📌 免费发布，图片最多 6 张，云端同步可见
     </div>
     <div class="fee-box">
       <div class="l">平台服务费</div><div class="r">免费</div>
@@ -266,11 +296,11 @@
       <div class="srow"><div class="lb">📍 默认位置</div><div class="val" id="s-city">未设置</div></div>
       <div class="srow"><div class="lb">🌙 深色模式</div><div class="toggle" id="darkToggle" onclick="toggleDark()"></div></div>
       <div class="srow"><div class="lb">🪙 Pi 账号</div><button class="btn ghost" id="piAuthBtn" onclick="piLogin()" style="opacity:.6">检测中...</button></div>
-      <div class="srow"><div class="lb">💳 Pi 支付测试</div><button class="btn ghost" id="piPayTestBtn" onclick="piPayTest()">支付 0.01π</button></div>
-      <div class="srow"><div class="lb">📤 导出数据</div><button class="btn ghost" onclick="exportData()">导出本地副本</button></div>
     </div>
-    <div class="empty" style="padding:18px 0 60px;cursor:pointer" onclick="toggleAdmin()">
-      <span id="adminToggleHint">· 点击开启运营面板（5 次） ·</span>
+    <div class="setting-links">
+      <div class="srow link" onclick="window.open('/terms.html', '_blank')"><div class="lb">📜 用户协议</div><span class="arrow">›</span></div>
+      <div class="srow link" onclick="window.open('/privacy.html', '_blank')"><div class="lb">🔒 隐私政策</div><span class="arrow">›</span></div>
+      <div class="srow link" onclick="openSheet('feedback')"><div class="lb">💬 帮助与反馈</div><span class="arrow">›</span></div>
     </div>
   </section>
 

@@ -88,15 +88,6 @@ export function renderHome() {
       `<div class="q" onclick="window.setCat('${c}')"><div class="q-icon ${icons[i - 1] || ''}">${CAT_ICON[c]}</div><span>${c}</span></div>`
   ).join('');
 
-  // Recommended items (horizontal scroll)
-  const recoItems = state.items.filter((it) => it.tpl === 'reco').slice(0, 5);
-  document.getElementById('recos').innerHTML =
-    recoItems.map((it) => recoHTML(it)).join('') ||
-    '<div class="empty">暂无推荐</div>';
-  document.getElementById('recoCount').textContent = recoItems.length
-    ? `共 ${recoItems.length} 件`
-    : '';
-
   // Category chips
   document.getElementById('cats').innerHTML = CATS.map(
     (c) =>
@@ -118,17 +109,8 @@ export function renderHome() {
     )
     .join('');
 
-  // Toggle reco button
-  document.getElementById('toggleReco').textContent = state.onlyReco
-    ? '显示全部'
-    : '只看推荐';
-  document.getElementById('listTitle').textContent = state.onlyReco
-    ? '推荐商品'
-    : '最新发布';
-
   // Grid items
   let items = state.items.slice();
-  if (state.onlyReco) items = items.filter((i) => i.tpl === 'reco');
   document.getElementById('empty').style.display = items.length ? 'none' : 'block';
   document.getElementById('list').innerHTML = items.map((it) => cardHTML(it)).join('');
 }

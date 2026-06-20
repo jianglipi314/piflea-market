@@ -126,3 +126,21 @@ window.closeSheet = closeSheet;
 window.goto = goto;
 window.toast = toast;
 window.getAllMyUserIds = getAllMyUserIds;
+
+// Debug panel
+window.toggleDebug = function() {
+  const panel = document.getElementById('debugPanel');
+  if (panel) panel.classList.toggle('show');
+};
+
+window.debugLog = function(msg, isError = false) {
+  const panel = document.getElementById('debugPanel');
+  if (panel) {
+    const div = document.createElement('div');
+    div.className = isError ? 'log err' : 'log';
+    div.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+  }
+  console.log(isError ? '[ERROR]' : '[DEBUG]', msg);
+};

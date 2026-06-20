@@ -7,7 +7,12 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://piflea-backend.
 
 let PiIsAvailable = false;
 let piUser = null;
-let initPromise = null; // Track Pi.init() completion
+let initCompleted = false; // Track if init has completed
+
+function debug(msg, isError = false) {
+  if (window.debugLog) window.debugLog(msg, isError);
+  console.log(isError ? '[ERROR]' : '[Pi SDK]', msg);
+}
 
 /**
  * Initialize Pi SDK and attempt to restore previous session.
@@ -15,47 +20,96 @@ let initPromise = null; // Track Pi.init() completion
  */
 export function initPiAndAuthenticate(callback) {
   const isPiBrowser = typeof window.Pi !== 'undefined';
+  debug('initPiAndAuthenticate called, isPiBrowser: ' + isPiBrowser);
 
   if (isPiBrowser) {
     const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
-    initPromise = window.Pi.init({
-      version: import.meta.env.VITE_PI_SDK_VERSION || '2.0',
-      sandbox: isSandbox
-    });
-
-    initPromise
-      .then(() => {
+    debug('Calling Pi.init(), sandbox: ' + isSandbox);
+    
+    try {
+      // Pi.init() may not return a Promise in some versions
+      const initResult = window.Pi.init({
+        version: import.meta.env.VITE_PI_SDK_VERSION || '2.0',
+        sandbox: isSandbox
+      });
+      
+      debug('Pi.init() returned: ' + typeof initResult);
+      
+      // Handle both Promise and non-Promise return values
+      const handleInitComplete = () => {
+        debug('Pi.init() completed');
         PiIsAvailable = true;
+        initCompleted = true;
         const cached = localStorage.getItem(PI_USER_KEY);
         if (cached) {
           try {
             piUser = JSON.parse(cached);
+            debug('Restored cached user: ' + piUser?.username);
             if (callback) callback(piUser);
-          } catch (e) {}
+          } catch (e) {
+            debug('Failed to parse cached user', true);
+          }
         }
         if (callback) callback(null);
-      })
-      .catch((err) => {
-        console.error('Pi init failed:', err);
-        PiIsAvailable = false;
-        if (callback) callback(null);
-      });
+      };
+      
+      if (initResult && typeof initResult.then === 'function') {
+        initResult.then(handleInitComplete).catch((err) => {
+          debug('Pi.init() promise rejected: ' + err, true);
+          PiIsAvailable = false;
+          initCompleted = true;
+          if (callback) callback(null);
+        });
+      } else {
+        // Pi.init() doesn't return a Promise, assume it's synchronous
+        handleInitComplete();
+      }
+    } catch (err) {
+      debug('Pi.init() error: ' + err, true);
+      PiIsAvailable = false;
+      initCompleted = true;
+      if (callback) callback(null);
+    }
   } else {
+    debug('Not in Pi Browser, skipping init');
     PiIsAvailable = false;
+    initCompleted = true;
     setTimeout(() => { if (callback) callback(null); }, 100);
   }
 
   return {
     isAvailable: () => PiIsAvailable,
     getUser: () => piUser,
-    waitForInit: () => initPromise || Promise.resolve()
+    waitForInit: () => Promise.resolve()
   };
 }
 
 /** Wait for Pi.init() to complete before proceeding */
 function ensureInit() {
-  if (initPromise) return initPromise;
-  return Promise.resolve();
+  debug('ensureInit called, initCompleted: ' + initCompleted);
+  
+  if (initCompleted) {
+    debug('Init already completed');
+    return Promise.resolve();
+  }
+  
+  // Wait for init to complete with timeout
+  return new Promise((resolve) => {
+    const checkInterval = setInterval(() => {
+      if (initCompleted) {
+        clearInterval(checkInterval);
+        clearTimeout(timeout);
+        debug('Init completed (waited)');
+        resolve();
+      }
+    }, 100);
+    
+    const timeout = setTimeout(() => {
+      clearInterval(checkInterval);
+      debug('ensureInit timeout after 5s', true);
+      resolve();
+    }, 5000);
+  });
 }
 
 /**
@@ -142,41 +196,54 @@ export function getPiUser() {
  * createPayment 是同步方法，不返回 Promise，通过 callbacks 通知结果
  */
 export function createPiPayment(amount, memo, metadata = {}, onComplete) {
-  console.log('[Pi SDK] createPiPayment called with amount:', amount);
+  debug('createPiPayment called, amount: ' + amount);
   
   if (!window.Pi) {
-    console.error('[Pi SDK] Error: window.Pi is undefined');
+    debug('window.Pi is undefined', true);
     toast('Pi SDK 不可用');
     if (onComplete) onComplete(false, 'Pi SDK 不可用');
     return;
   }
   
-  console.log('[Pi SDK] window.Pi exists:', !!window.Pi);
+  debug('window.Pi exists: true');
   
   if (typeof window.Pi.createPayment !== 'function') {
-    console.error('[Pi SDK] Error: window.Pi.createPayment is not a function');
+    debug('window.Pi.createPayment is not a function', true);
     toast('Pi SDK createPayment 不可用');
     if (onComplete) onComplete(false, 'Pi SDK createPayment 不可用');
     return;
   }
   
-  console.log('[Pi SDK] window.Pi.createPayment is available');
+  debug('window.Pi.createPayment is available');
   
   if (!piUser) {
-    console.error('[Pi SDK] Error: piUser is null, user not logged in');
+    debug('piUser is null, user not logged in', true);
     toast('请先登录 Pi 账号');
     if (onComplete) onComplete(false, '请先登录 Pi 账号');
     return;
   }
   
-  console.log('[Pi SDK] User is logged in:', piUser.username);
+  debug('User logged in: ' + piUser.username);
+
+  // Timeout to prevent hanging - if no callback fires within 30s, reset the button
+  let timeoutId = setTimeout(() => {
+    debug('Payment timeout - no callback fired within 30s', true);
+    toast('支付超时，请重试');
+    if (onComplete) onComplete(false, '支付超时');
+  }, 30000);
 
   const resetButton = () => {
+    clearTimeout(timeoutId);
     if (onComplete) onComplete(true);
   };
 
+  const failButton = (msg) => {
+    clearTimeout(timeoutId);
+    if (onComplete) onComplete(false, msg);
+  };
+
   ensureInit().then(() => {
-    console.log('[Pi SDK] Pi.init() completed, creating payment...');
+    debug('Creating payment...');
     
     const paymentData = {
       amount: String(amount),
@@ -185,42 +252,48 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
       uid: piUser.uid,
     };
     
-    console.log('[Pi SDK] Payment data:', JSON.stringify(paymentData));
+    debug('Payment data: ' + JSON.stringify(paymentData));
 
-    window.Pi.createPayment(paymentData, {
-      onReadyForServerApproval: function (paymentId) {
-        console.log('[Pi SDK] onReadyForServerApproval:', paymentId);
-        toast('支付等待确认');
-        fetch(BACKEND_URL + '/api/approve', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentId }),
-        }).catch(e => console.error('approve err:', e));
-      },
-      onReadyForServerCompletion: function (paymentId, txid) {
-        console.log('[Pi SDK] onReadyForServerCompletion:', paymentId, txid);
-        toast('✅ 支付完成！');
-        fetch(BACKEND_URL + '/api/complete', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentId, txid }),
-        }).catch(e => console.error('complete err:', e));
-        resetButton();
-      },
-      onCancel: function (paymentId) {
-        console.log('[Pi SDK] onCancel:', paymentId);
-        toast('支付已取消');
-        resetButton();
-      },
-      onError: function (error, payment) {
-        console.error('[Pi SDK] onError:', error, payment);
-        toast('支付失败：' + (error?.message || '未知错误'));
-        resetButton();
-      },
-    });
-    
-    console.log('[Pi SDK] createPayment called successfully');
+    try {
+      window.Pi.createPayment(paymentData, {
+        onReadyForServerApproval: function (paymentId) {
+          debug('onReadyForServerApproval: ' + paymentId);
+          toast('支付等待确认');
+          fetch(BACKEND_URL + '/api/approve', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId }),
+          }).catch(e => debug('approve err: ' + e, true));
+        },
+        onReadyForServerCompletion: function (paymentId, txid) {
+          debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
+          toast('✅ 支付完成！');
+          fetch(BACKEND_URL + '/api/complete', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId, txid }),
+          }).catch(e => debug('complete err: ' + e, true));
+          resetButton();
+        },
+        onCancel: function (paymentId) {
+          debug('onCancel: ' + paymentId);
+          toast('支付已取消');
+          resetButton();
+        },
+        onError: function (error, payment) {
+          debug('onError: ' + (error?.message || error), true);
+          toast('支付失败：' + (error?.message || '未知错误'));
+          failButton(error?.message || '支付失败');
+        },
+      });
+      
+      debug('createPayment called successfully');
+    } catch (e) {
+      debug('createPayment exception: ' + e.message, true);
+      toast('支付异常：' + e.message);
+      failButton(e.message);
+    }
   }).catch(e => {
-    console.error('[Pi SDK] ensureInit error:', e);
+    debug('ensureInit error: ' + e.message, true);
     toast('Pi SDK 初始化失败：' + e.message);
-    if (onComplete) onComplete(false, 'Pi SDK 初始化失败');
+    failButton('Pi SDK 初始化失败');
   });
 }
