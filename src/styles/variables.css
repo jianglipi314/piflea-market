@@ -1,0 +1,64 @@
+/* ============ Theme Variables ============ */
+:root {
+  --bg: #f4f5f9;
+  --card: #ffffff;
+  --ink: #1b2030;
+  --ink-2: #5a607a;
+  --line: #eceff5;
+  --brand: #ff5533;
+  --brand-2: #ffd23f;
+  --accent: #3e66ff;
+  --ok: #20a480;
+  --warn: #f59e0b;
+  --shadow: 0 6px 18px rgba(20, 24, 40, 0.06);
+  --radius: 14px;
+}
+
+html[data-dark="1"] {
+  --bg: #0f1220;
+  --card: #181c2e;
+  --ink: #eef0fa;
+  --ink-2: #9aa3c5;
+  --line: #262b44;
+  --shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+html[data-dark="1"] .topbar {
+  background: linear-gradient(180deg, var(--card) 70%, rgba(24, 28, 46, 0.6));
+}
+
+html[data-dark="1"] .fav {
+  background: #2c3250;
+  color: #cfd5f0;
+}
+
+html[data-dark="1"] .rules {
+  background: linear-gradient(180deg, #2a1f12, #181c2e);
+  border-color: #554022;
+  color: #ffd98a;
+}
+
+html[data-dark="1"] .rules b {
+  color: #ffcf70;
+}
+
+html[data-dark="1"] .hero .back,
+html[data-dark="1"] .hero .share {
+  background: #2c3250;
+  color: #eef0fa;
+}
+
+html[data-dark="1"] .list .row-item .rm {
+  color: #fca5a5;
+  border-color: #4a2a2a;
+}
+
+html[data-dark="1"] .list .row-item .edit-btn {
+  color: #9ab3ff;
+  border-color: #3a4a7a;
+}
+
+html[data-dark="1"] .nav {
+  background: rgba(24, 28, 46, 0.94);
+  border-top-color: #262b44;
+}

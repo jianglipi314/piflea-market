@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>π 跳蚤市场 · 先锋二手</title>
+  <!-- 同步加载，确保 main.js 执行时 window.Pi 已就绪 -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="logo">π</div>
+    <button class="icon-btn" onclick="openSheet('menu')" title="菜单">☰</button>
+    <div>
+      <div class="top-title" id="topTitle">π 跳蚤市场</div>
+      <div class="top-sub" id="topSub">先锋二手 · 云端数据</div>
+    </div>
+    <button class="icon-btn" onclick="toggleDark()" id="darkBtn" title="切换主题">🌙</button>
+  </div>
+
+  <!-- Home -->
+  <section class="view active" id="view-home">
+    <div class="banner">
+      <h2>零门槛卖闲置 · 用 π 秒级到账</h2>
+      <p><b>免费发布</b>，平台担保交易 · 云端实时同步</p>
+      <span class="coin">π</span>
+      <button class="cta" onclick="goto('publish')">立即发布 →</button>
+    </div>
+    <div class="quick" id="quick"></div>
+    <div class="section-title"><h3>今日推荐</h3><span class="sub" id="recoCount"></span></div>
+    <div class="recos" id="recos"></div>
+    <div class="section-title"><h3>分类浏览</h3><span class="sub" id="catTip">全部</span></div>
+    <div class="cats" id="cats"></div>
+    <div class="sortbar" id="sortbar"></div>
+    <div class="section-title"><h3 id="listTitle">最新发布</h3><button class="sub" id="toggleReco" onclick="toggleReco()">只看推荐</button></div>
+    <div id="listLoader" class="loading">加载中...</div>
+    <div class="grid" id="list"></div>
+    <div class="empty" id="empty" style="display:none">暂无商品，去发一个试试～</div>
+  </section>
+
+  <!-- Search -->
+  <section class="view" id="view-search">
+    <div class="search-box">
+      <span>🔍</span>
+      <input id="qInput" placeholder="搜索：iPhone、边几、绘本…" oninput="onSearch()"/>
+      <button onclick="document.getElementById('qInput').value='';onSearch()" style="font-size:14px;color:var(--ink-2);background:none;border:none;cursor:pointer">清除</button>
+    </div>
+    <div class="tagcloud" id="tagcloud"></div>
+    <div id="searchLoader" class="loading" style="display:none">加载中...</div>
+    <div class="grid" id="searchList"></div>
+    <div class="empty" id="searchEmpty" style="display:none">没有匹配的商品，换个关键词试试～</div>
+  </section>
+
+  <!-- Publish -->
+  <section class="view" id="view-publish">
+    <div class="steps" id="steps">
+      <div class="step on" data-step="1">① 填写</div>
+      <div class="step" data-step="2">② 预览</div>
+      <div class="step" data-step="3">③ 完成</div>
+    </div>
+    <div class="rules">
+      <b>📌 上架规则</b><br/>
+      · 现在支持 <b>免费发布</b>，无需任何发布费用<br/>
+      · 商品图片最多上传 <b>6 张</b>，需真实上传到云端存储<br/>
+      · 所有商品云端同步，所有用户可见
+    </div>
+    <div class="fee-box">
+      <div class="l">平台服务费</div><div class="r">免费</div>
+    </div>
+    <form class="form" id="publishForm" onsubmit="doPublish(event)">
+      <div class="row"><label>商品标题 *</label>
+        <input id="f-title" placeholder="例如：九成新 iPhone 13 128G 黑色" required maxlength="40"/>
+        <div class="hint">40 字以内，突出成色 / 型号 / 颜色</div>
+      </div>
+      <div class="row"><label>分类</label>
+        <select id="f-cat">
+          <option>数码</option><option>生活</option><option>美妆</option><option>图书</option><option>服饰</option><option>母婴</option><option>运动</option>
+        </select>
+      </div>
+      <div class="two-col" style="margin-top:6px">
+        <div class="row"><label>价格（π）</label><input id="f-price" type="number" step="0.01" min="0.01" placeholder="2.5" required/></div>
+        <div class="row"><label>所在城市</label><input id="f-city" placeholder="北京 · 海淀" maxlength="20"/></div>
+      </div>
+      <div class="row"><label>商品描述</label><textarea id="f-desc" placeholder="买了多久、是否带包装、是否有瑕疵、可面交地点..." required></textarea></div>
+      <div class="row"><label>图片（最多 6 张，上传到云端）</label>
+        <div class="img-uploader" id="uploader">
+          <button type="button" class="thumb" onclick="document.getElementById('f-files').click()">＋</button>
+        </div>
+        <input id="f-files" type="file" accept="image/*" multiple style="display:none" onchange="onFiles(event)"/>
+        <div class="hint" id="uploadHint">点击 + 选择图片，图片将上传到云端存储</div>
+      </div>
+      <div class="two-col" style="margin-top:6px">
+        <div class="row"><label>卖家昵称 *</label><input id="f-seller" placeholder="你的昵称" required maxlength="16"/></div>
+        <div class="row"><label>联系方式</label><input id="f-contact" placeholder="站内信 / 邮箱（可选）" maxlength="30"/></div>
+      </div>
+      <div class="preview-wrap" id="preview" style="display:none">
+        <h4>📋 发布预览</h4><div id="previewBody"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn ghost" onclick="clearForm()">清空</button>
+        <button type="button" class="btn ghost" id="btnPreview" onclick="togglePreview()">预览</button>
+        <button type="submit" class="btn primary" id="f-submit">免费发布</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Detail -->
+  <section class="view" id="view-detail">
+    <div class="hero" id="d-hero">
+      <button class="back" onclick="goto('home')">‹</button>
+      <button class="share" onclick="openSheet('share')">⇪</button>
+      <span id="d-emoji">📦</span>
+      <div class="gallery-dots" id="d-dots"></div>
+    </div>
+    <div class="detail-card">
+      <h2 class="title" id="d-title">—</h2>
+      <div class="price"><span id="d-price">0</span> <small style="font-weight:500">π</small></div>
+      <div class="meta-row" id="d-meta"></div>
+      <div class="seller-row">
+        <div class="avatar" id="d-avatar">?</div>
+        <div class="t">
+          <div class="name" id="d-seller">—</div>
+          <div class="sub" id="d-seller-sub">平台认证卖家</div>
+        </div>
+        <div class="right" id="d-loc">—</div>
+      </div>
+      <div class="seller-row" id="d-contact-row" style="display:none">
+        <div class="avatar" style="background:var(--brand);color:#fff">📞</div>
+        <div class="t">
+          <div class="name" style="font-size:13px">卖家联系方式</div>
+          <div class="sub" id="d-contact" style="font-size:12px;color:var(--brand);font-weight:600;word-break:break-all">—</div>
+        </div>
+        <button class="btn ghost" id="d-copy-contact" style="padding:8px 14px;font-size:12px">复制</button>
+      </div>
+    </div>
+    <div class="desc" id="d-desc">—</div>
+    <div class="action-row">
+      <button class="btn ghost" onclick="openDetailChat()">💬 联系卖家</button>
+      <button class="btn ghost" onclick="openSheet('share')">⇪ 分享</button>
+      <button class="btn ghost" onclick="openSheet('report')">⚠ 举报</button>
+    </div>
+    <div class="qrcard"><canvas id="qrCanvas" width="96" height="96" style="width:96px;height:96px"></canvas>
+      <div class="txt"><b>扫码查看商品</b><br/>云端数据 · 实时同步</div>
+    </div>
+    <div class="detail-fab" id="d-fab">
+      <button class="btn primary" onclick="fakeBuy()">立即购买</button>
+    </div>
+  </section>
+
+  <!-- Order Confirmation -->
+  <section class="view" id="view-order">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button class="icon-btn" onclick="goto('detail')" style="min-width:34px;width:34px;height:34px">‹</button>
+      <div style="font-weight:700;font-size:16px">确认订单</div>
+    </div>
+
+    <!-- Item Info -->
+    <div style="background:var(--card);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);display:flex;gap:12px">
+      <div id="o-pic" style="width:80px;height:80px;border-radius:10px;background:var(--bg);display:grid;place-items:center;font-size:36px;color:#b8bfd1;flex-shrink:0;overflow:hidden">
+        <span id="o-emoji">📦</span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div id="o-title" style="font-weight:600;font-size:15px;margin-bottom:4px">—</div>
+        <div id="o-seller" style="font-size:12px;color:var(--ink-2)">卖家：—</div>
+        <div id="o-meta" style="font-size:12px;color:var(--ink-2);margin-top:2px">—</div>
+      </div>
+    </div>
+
+    <!-- Fee Breakdown -->
+    <div style="background:var(--card);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow)">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px">💰 费用明细</div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px">
+        <span style="color:var(--ink-2)">商品金额</span>
+        <span id="o-item-price" style="font-weight:600">0.00 π</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px">
+        <span style="color:var(--ink-2)">平台服务费</span>
+        <span id="o-fee" style="font-weight:600;color:var(--ok)">🎉 0.00 π 限时免费</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px">
+        <span style="color:var(--ink-2)">区块链网络费</span>
+        <span id="o-network-fee" style="font-weight:600">0.01 π</span>
+      </div>
+      <hr style="border:none;border-top:1px dashed var(--line);margin:8px 0">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:16px">
+        <span style="font-weight:700">实付金额</span>
+        <span id="o-total" style="font-weight:800;color:var(--brand);font-size:18px">0.01 π</span>
+      </div>
+    </div>
+
+    <!-- Fee Explanation -->
+    <div style="background:var(--card);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow);font-size:12px;color:var(--ink-2);line-height:1.7">
+      <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px">ℹ️ 费用说明</div>
+      <div>• 商品金额：卖家定价，确认收货后自动转给卖家账户</div>
+      <div>• 平台服务费：Piflea 提供交易担保和技术服务（目前 <b style="color:var(--ok)">限时免费</b>）</div>
+      <div>• 区块链网络费：Pi 区块链网络收取的固定交易确认费用（0.01 π/笔）</div>
+    </div>
+
+    <!-- Security Guarantee -->
+    <div style="background:var(--card);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow);font-size:12px;color:var(--ink-2);line-height:1.7">
+      <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px">🔒 担保交易保障</div>
+      <div>您的资金由 Piflea 平台托管，确认收货后才会释放给卖家。</div>
+      <div>如未收到货或商品与描述不符，可在 7 天内申请退款。</div>
+    </div>
+
+    <!-- Confirm Button -->
+    <div style="margin-top:16px">
+      <button id="o-confirm-btn" class="btn primary" onclick="confirmPayment()" style="width:100%;font-size:16px;padding:16px">确认支付 — π</button>
+      <div style="text-align:center;font-size:11px;color:var(--ink-2);margin-top:8px">点击支付即表示您同意 <a href="/terms.html" target="_blank" style="color:var(--accent)">《Piflea 用户协议》</a> 和《交易规则》</div>
+    </div>
+  </section>
+
+  <!-- Chat List -->
+  <section class="view" id="view-chats">
+    <div class="section-title"><h3>消息中心</h3><span class="sub" id="chatCount"></span></div>
+    <div class="chat-list" id="chatList"></div>
+    <div class="empty" id="chatEmpty">还没有消息，点进商品页联系卖家试试～<br/>
+      <button class="btn ghost" style="margin-top:12px" onclick="checkChatTable()">检测消息表</button>
+    </div>
+  </section>
+
+  <!-- Chat Conversation -->
+  <section class="view" id="view-chat">
+    <div class="chat-head">
+      <button class="back" onclick="goto('chats')">‹</button>
+      <div class="avatar" id="chat-avatar">?</div>
+      <div class="t" style="flex:1;min-width:0">
+        <div class="name" id="chat-name">—</div>
+        <div class="sub" id="chat-sub">关于某件闲置</div>
+      </div>
+      <button class="icon-btn" onclick="toast('已屏蔽该卖家（Demo）')">🛡</button>
+    </div>
+    <div class="msg-area" id="msgArea"></div>
+    <div class="chat-input">
+      <input id="chatInput" placeholder="发送消息给卖家..." onkeydown="if(event.key==='Enter')sendMsg()"/>
+      <button class="send" onclick="sendMsg()">→</button>
+    </div>
+  </section>
+
+  <!-- Mine -->
+  <section class="view" id="view-mine">
+    <div class="profile">
+      <div class="avatar" id="m-avatar">我</div>
+      <div>
+        <div class="name" id="m-name">本地用户</div>
+        <div class="id" id="m-id">uid_local_0001 · 平台认证</div>
+      </div>
+      <button class="edit" onclick="editMyName()">编辑昵称</button>
+    </div>
+    <div class="wallet">
+      <div class="cell"><div class="n" id="m-post">0</div><div class="l">我的发布</div></div>
+      <div class="cell"><div class="n" id="m-view">0</div><div class="l">总浏览</div></div>
+      <div class="cell"><div class="n" id="m-pi">100.0</div><div class="l">钱包 π</div></div>
+    </div>
+    <div class="tabs">
+      <button class="tab on" id="tab-post" onclick="switchMine('post')">我的发布</button>
+      <button class="tab" id="tab-hist" onclick="switchMine('hist')">浏览记录</button>
+    </div>
+    <div id="mineLoader" class="loading" style="display:none">加载中...</div>
+    <div class="list" id="mine-list"></div>
+    <div class="empty" id="mine-empty">空空如也～</div>
+    <div class="setting">
+      <div class="srow"><div class="lb">📍 默认位置</div><div class="val" id="s-city">未设置</div></div>
+      <div class="srow"><div class="lb">🌙 深色模式</div><div class="toggle" id="darkToggle" onclick="toggleDark()"></div></div>
+      <div class="srow"><div class="lb">🪙 Pi 账号</div><button class="btn ghost" id="piAuthBtn" onclick="piLogin()" style="opacity:.6">检测中...</button></div>
+      <div class="srow"><div class="lb">💳 Pi 支付测试</div><button class="btn ghost" id="piPayTestBtn" onclick="piPayTest()">支付 0.01π</button></div>
+      <div class="srow"><div class="lb">📤 导出数据</div><button class="btn ghost" onclick="exportData()">导出本地副本</button></div>
+    </div>
+    <div class="empty" style="padding:18px 0 60px;cursor:pointer" onclick="toggleAdmin()">
+      <span id="adminToggleHint">· 点击开启运营面板（5 次） ·</span>
+    </div>
+  </section>
+
+  <!-- Admin -->
+  <section class="view" id="view-admin">
+    <div class="section-title"><h3>运营后台</h3><span class="sub" onclick="goto('mine')">返回 ›</span></div>
+    <div class="stat-grid">
+      <div class="stat"><div class="n" id="a-items">0</div><div class="l">商品数</div></div>
+      <div class="stat"><div class="n" id="a-view">0</div><div class="l">总浏览</div></div>
+      <div class="stat"><div class="n" id="a-chat">0</div><div class="l">对话数</div></div>
+    </div>
+    <div class="section-title"><h3>全部商品</h3><span class="sub">可切换推荐</span></div>
+    <div id="adminLoader" class="loading" style="display:none">加载中...</div>
+    <div class="list" id="adminList"></div>
+    <div class="empty" style="padding:18px 0 60px">— end —</div>
+  </section>
+
+  <!-- Bottom Nav -->
+  <nav class="nav" id="nav">
+    <button data-v="home" class="on"><span class="ic">🏠</span><span>首页</span></button>
+    <button data-v="search"><span class="ic">🔍</span><span>搜索</span></button>
+    <button class="publish" data-v="publish"><span class="ic">＋</span><span>发布</span></button>
+    <button data-v="chats" style="position:relative">
+      <span class="ic">💬<span id="unreadBadge" style="position:absolute;top:-4px;right:-8px;background:#ff3b30;color:#fff;font-size:10px;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;font-weight:700;padding:0 4px">0</span></span>
+      <span>消息</span>
+    </button>
+    <button data-v="mine"><span class="ic">👤</span><span>我的</span></button>
+  </nav>
+</div>
+
+<!-- Sheet Modal -->
+<div class="sheet-mask" id="sheet">
+  <div class="sheet">
+    <h3 id="sheetTitle">标题</h3>
+    <div id="sheetBody" style="font-size:14px;color:var(--ink-2);line-height:1.7"></div>
+    <div class="grid-actions" id="sheetActions"></div>
+    <div class="actions"><button class="btn ghost" onclick="closeSheet()">关闭</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Main Entry -->
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
