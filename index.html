@@ -294,7 +294,14 @@
     <div id="mineLoader" class="loading" style="display:none">加载中...</div>
     <div class="list" id="mine-list"></div>
     <div class="empty" id="mine-empty">空空如也～</div>
-    <div class="setting">
+    <div style="display:flex;gap:8px;margin:12px 14px 8px">
+<button class="tab on" id="tab-buy" onclick="loadOrders('buyer')" style="flex:1">我的购买</button>
+<button class="tab" id="tab-sell" onclick="loadOrders('seller')" style="flex:1">我的出售</button>
+</div>
+<div id="orderLoader" class="loading" style="display:none;padding:12px">加载中...</div>
+<div class="list" id="orderList"></div>
+<div class="empty" id="orderEmpty" style="display:none;padding:20px 14px">暂无订单</div>
+  <div class="setting">
       <div class="srow"><div class="lb">📍 默认位置</div><div class="val" id="s-city">未设置</div></div>
       <div class="srow"><div class="lb">🌙 深色模式</div><div class="toggle" id="darkToggle" onclick="toggleDark()"></div></div>
       <div class="srow"><div class="lb">🪙 Pi 账号</div><button class="btn ghost" id="piAuthBtn" onclick="piLogin()" style="opacity:.6">检测中...</button></div>
