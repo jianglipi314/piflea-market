@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<script type="module" crossorigin src="/assets/index-e0DrCSyz.js"></script>
+<script type="module" crossorigin src="/assets/index-CgWZdrpS.js"></script>
 <link rel="stylesheet" crossorigin href="/assets/index-CJqAzmsW.css">
 
 <head>
@@ -104,8 +104,8 @@
   <!-- Detail -->
   <section class="view" id="view-detail">
     <div class="hero" id="d-hero">
-      <button class="back" onclick="goto('home')">‹</button>
-      <button class="share" onclick="openSheet('share')">⇪</button>
+      <button class="back" id="detail-back-btn">‹</button>
+      <button class="share" id="detail-share-btn">⇪</button>
       <span id="d-emoji">📦</span>
       <div class="gallery-dots" id="d-dots"></div>
     </div>
@@ -259,10 +259,10 @@
       <div class="cell"><div class="n" id="m-pi">100.0</div><div class="l">钱包 π</div></div>
     </div>
     <div class="tabs">
-      <button class="tab on" id="tab-post" onclick="window.switchMine && switchMine('post')">我的发布</button>
-      <button class="tab" id="tab-buy" onclick="window.switchMine && switchMine('buy')">我的购买</button>
-      <button class="tab" id="tab-sell" onclick="window.switchMine && switchMine('sell')">我的出售</button>
-      <button class="tab" id="tab-hist" onclick="window.switchMine && switchMine('hist')">浏览记录</button>
+      <button class="tab on" id="tab-post">我的发布</button>
+      <button class="tab" id="tab-buy">我的购买</button>
+      <button class="tab" id="tab-sell">我的出售</button>
+      <button class="tab" id="tab-hist">浏览记录</button>
     </div>
     <div id="mineLoader" class="loading" style="display:none">加载中...</div>
     <div class="list" id="mine-list"></div>
