@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<script type="module" crossorigin src="/assets/index-B4knNv06.js"></script>
+<script type="module" crossorigin src="/assets/index-e0DrCSyz.js"></script>
 <link rel="stylesheet" crossorigin href="/assets/index-CJqAzmsW.css">
 
 <head>
@@ -259,10 +259,10 @@
       <div class="cell"><div class="n" id="m-pi">100.0</div><div class="l">钱包 π</div></div>
     </div>
     <div class="tabs">
-      <button class="tab on" id="tab-post" onclick="console.log('点击了：我的发布');switchMine('post')">我的发布</button>
-      <button class="tab" id="tab-buy" onclick="console.log('点击了：我的购买');switchMine('buy')">我的购买</button>
-      <button class="tab" id="tab-sell" onclick="console.log('点击了：我的出售');switchMine('sell')">我的出售</button>
-      <button class="tab" id="tab-hist" onclick="console.log('点击了：浏览记录');switchMine('hist')">浏览记录</button>
+      <button class="tab on" id="tab-post" onclick="window.switchMine && switchMine('post')">我的发布</button>
+      <button class="tab" id="tab-buy" onclick="window.switchMine && switchMine('buy')">我的购买</button>
+      <button class="tab" id="tab-sell" onclick="window.switchMine && switchMine('sell')">我的出售</button>
+      <button class="tab" id="tab-hist" onclick="window.switchMine && switchMine('hist')">浏览记录</button>
     </div>
     <div id="mineLoader" class="loading" style="display:none">加载中...</div>
     <div class="list" id="mine-list"></div>
