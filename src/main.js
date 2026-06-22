@@ -1,4 +1,4 @@
-/* ============ PiFlea Market — Main Entry ============ */
+﻿/* ============ PiFlea Market — Main Entry ============ */
 // Imports
 import './styles/variables.css';
 import './styles/base.css';
@@ -8,7 +8,7 @@ import './styles/views.css';
 import { createState } from './state';
 import { getOwnerId, toast, getAllMyUserIds } from './utils';
 import { getSupabase } from './supabase';
-import { initPiAndAuthenticate } from './pi-sdk';
+import { initPiAndAuthenticate, isPiAuthenticated, getPiUser } from './pi-sdk';
 import { initNav, goto } from './router';
 import { initSheet } from './components/sheet';
 
@@ -31,6 +31,10 @@ import {
   exportData,
   markSold,
   unsetSold,
+  gotoOrderDetail,
+  loadOrders,
+  completeOrder,
+  markShipped,
 } from './views/mine';
 import { renderAdmin, adminToggleReco, adminDelete } from './views/admin';
 import { openSheet, closeSheet } from './components/sheet';
@@ -46,8 +50,26 @@ document.addEventListener('DOMContentLoaded', () => {
   initSheet();
 
   // Init Pi SDK
-  initPiAndAuthenticate(() => {
+  initPiAndAuthenticate((restoredUser) => {
     updatePiButtonState();
+    if (restoredUser) {
+      // 恢复登录后刷新与个人相关的数据
+      import('./views/mine').then((mod) => {
+        if (mod.applyPiUser) mod.applyPiUser();
+        if (mod.loadOrders) {
+          mod.loadOrders('buyer');
+          mod.loadOrders('seller');
+        }
+      });
+    } else {
+      // Pi SDK 初始化完成但无缓存用户，立即请求 payments scope 登录
+      import('./pi-sdk').then((mod) => {
+        if (mod.isPiAvailable && mod.isPiAvailable() && !mod.isPiAuthenticated()) {
+          console.log('[main] Auto-triggering Pi authenticate with payments scope');
+          mod.authenticateWithPi().then(() => updatePiButtonState());
+        }
+      });
+    }
   });
 
   // Apply dark mode
@@ -65,16 +87,18 @@ export function toggleDark() {
 }
 
 function applyDarkOnLoad() {
-  const attr = state.dark ? '1' : '';
-  document.documentElement.setAttribute('data-dark', attr);
+  const isDark = !!state.dark;
+  document.documentElement.setAttribute('data-dark', isDark ? '1' : '');
+  document.documentElement.classList.toggle('dark', isDark);
   const btn = document.getElementById('darkBtn');
-  if (btn) btn.textContent = state.dark ? '☀' : '🌙';
+  if (btn) btn.textContent = isDark ? '☀' : '🌙';
   const tg = document.getElementById('darkToggle');
-  if (tg) tg.classList.toggle('on', !!state.dark);
+  if (tg) tg.classList.toggle('on', isDark);
 }
 
 // ============ Expose functions globally (for inline onclick) ============ //
 // Home
+window.toggleDark = toggleDark;
 window.setCat = setCat;
 window.toggleReco = toggleReco;
 window.setSort = setSort;
@@ -113,6 +137,14 @@ window.piLogout = piLogout;
 window.exportData = exportData;
 window.markSold = markSold;
 window.unsetSold = unsetSold;
+window.isPiAuthenticated = isPiAuthenticated;
+window.getPiUser = getPiUser;
+window.loadOrders = loadOrders;
+window.completeOrder = completeOrder;
+window.markShipped = markShipped;
+window.gotoOrderDetail = gotoOrderDetail;
+// Prevent Vite tree-shaking
+void loadOrders; void completeOrder; void markShipped; void gotoOrderDetail;
 
 // Admin
 window.adminToggleReco = adminToggleReco;
@@ -127,20 +159,4 @@ window.goto = goto;
 window.toast = toast;
 window.getAllMyUserIds = getAllMyUserIds;
 
-// Debug panel
-window.toggleDebug = function() {
-  const panel = document.getElementById('debugPanel');
-  if (panel) panel.classList.toggle('show');
-};
 
-window.debugLog = function(msg, isError = false) {
-  const panel = document.getElementById('debugPanel');
-  if (panel) {
-    const div = document.createElement('div');
-    div.className = isError ? 'log err' : 'log';
-    div.textContent = new Date().toLocaleTimeString() + ' ' + msg;
-    panel.appendChild(div);
-    panel.scrollTop = panel.scrollHeight;
-  }
-  console.log(isError ? '[ERROR]' : '[DEBUG]', msg);
-};

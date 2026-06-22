@@ -1,4 +1,4 @@
-/* ============ Detail View ============ */
+﻿/* ============ Detail View ============ */
 
 import { state } from '../main';
 import { HIST_KEY } from '../state';
@@ -37,6 +37,10 @@ export async function openDetail(id) {
   document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
   document.getElementById('view-detail').classList.add('active');
   document.querySelectorAll('.nav button').forEach((b) => b.classList.remove('on'));
+
+  // 更新顶部标题为"商品详情"
+  document.getElementById('topTitle').textContent = '商品详情';
+  document.getElementById('topSub').textContent = '云端实时同步';
 
   // Populate fields
   document.getElementById('d-title').textContent = it.title;
@@ -114,8 +118,11 @@ export async function openDetail(id) {
 
   hero.onclick = (e) => {
     if (!it.images || !it.images.length) return;
-    const tg = e.target.closest('.back') || e.target.closest('.share');
+    // 兼容 Pi Browser：同时检查 closest 和 tagName
+    const tg = e.target.closest ? (e.target.closest('.back') || e.target.closest('.share')) : null;
     if (tg) return;
+    // 额外检查：如果点击的是 button 元素，不触发图片切换
+    if (e.target.tagName === 'BUTTON') return;
     heroImgIdx = (heroImgIdx + 1) % it.images.length;
     const img = hero.querySelector('img');
     if (img) img.src = it.images[heroImgIdx];
@@ -123,6 +130,27 @@ export async function openDetail(id) {
       s.classList.toggle('on', i === heroImgIdx)
     );
   };
+
+  // 返回按钮用 addEventListener，不依赖内联 onclick（Pi Browser 兼容）
+  const backBtn = document.getElementById('detail-back-btn');
+  if (backBtn) {
+    backBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      console.log('[detail] 返回按钮点击');
+      goto('home');
+    });
+  }
+
+  // 分享按钮
+  const shareBtn = document.getElementById('detail-share-btn');
+  if (shareBtn) {
+    shareBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      openSheet('share');
+    });
+  }
 
   // Update buy button for sold items
   const fab = document.getElementById('d-fab');
@@ -231,3 +259,4 @@ export function openDetailChat() {
     mod.openChatByItem(it, other, key);
   });
 }
+
