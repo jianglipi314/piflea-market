@@ -260,7 +260,8 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     const paymentData = {
       amount: String(amount),
       memo: memo || 'Piflea payment',
-      metadata: { app: 'piflea-market', ...metadata }
+      metadata: { app: 'piflea-market', ...metadata },
+      uid: 'payment-' + Date.now()
     };
     
     debug('Payment data: ' + JSON.stringify(paymentData));
