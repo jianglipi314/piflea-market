@@ -95,16 +95,18 @@ function ensureInit() {
   
   // Wait for init to complete with timeout
   return new Promise((resolve) => {
+    let timeout; // 先声明变量
+    
     const checkInterval = setInterval(() => {
       if (initCompleted) {
         clearInterval(checkInterval);
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
         debug('Init completed (waited)');
         resolve();
       }
     }, 100);
     
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       clearInterval(checkInterval);
       debug('ensureInit timeout after 5s', true);
       resolve();
