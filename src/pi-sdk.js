@@ -258,16 +258,25 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     const paymentData = {
       amount: Number(amount),
       memo: memo || 'Piflea payment',
-      metadata: { app: 'piflea-market', ...metadata },
-      uid: piUser.uid,
+      metadata: { app: 'piflea-market', ...metadata }
     };
     
     debug('Payment data: ' + JSON.stringify(paymentData));
+    debug('Payment data types - amount: ' + typeof paymentData.amount + ', amount value: ' + paymentData.amount);
+
+    // 验证 amount 是否为有效数字
+    if (isNaN(paymentData.amount) || paymentData.amount <= 0) {
+      debug('Invalid amount: ' + paymentData.amount, true);
+      toast('支付金额无效');
+      failButton('支付金额无效');
+      return;
+    }
 
     try {
+      debug('About to call window.Pi.createPayment...');
       window.Pi.createPayment(paymentData, {
         onReadyForServerApproval: function (paymentId) {
-          debug('onReadyForServerApproval: ' + paymentId);
+          debug('onReadyForServerApproval called! paymentId: ' + paymentId);
           toast('支付等待确认');
           fetch(BACKEND_URL + '/api/approve', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
