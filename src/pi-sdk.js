@@ -28,8 +28,8 @@ export function initPiAndAuthenticate(callback) {
     
     try {
       // Pi.init() may not return a Promise in some versions
+      // 不指定 version，让 SDK 自动使用最新版本
       const initResult = window.Pi.init({
-        version: import.meta.env.VITE_PI_SDK_VERSION || '2.0',
         sandbox: isSandbox
       });
       
@@ -108,9 +108,9 @@ function ensureInit() {
     
     timeout = setTimeout(() => {
       clearInterval(checkInterval);
-      debug('ensureInit timeout after 5s', true);
+      debug('ensureInit timeout after 15s', true);
       resolve();
-    }, 5000);
+    }, 15000);
   });
 }
 
