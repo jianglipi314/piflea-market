@@ -46,5 +46,27 @@ app.post('/api/complete', async (req, res) => {
   }
 });
 
+app.post('/api/incomplete', async (req, res) => {
+  const { paymentId } = req.body;
+  if (!paymentId) return res.status(400).json({ error: 'paymentId required' });
+
+  console.log('[Backend] Incomplete payment:', paymentId);
+  
+  // 这里可以添加处理未完成支付的逻辑，比如标记订单状态、通知用户等
+  // 目前只记录日志，返回成功
+  res.json({ success: true, message: 'Incomplete payment recorded' });
+});
+
+app.post('/api/cancelled_payment', async (req, res) => {
+  const { paymentId } = req.body;
+  if (!paymentId) return res.status(400).json({ error: 'paymentId required' });
+
+  console.log('[Backend] Cancelled payment:', paymentId);
+  
+  // 这里可以添加处理取消支付的逻辑，比如释放库存、通知用户等
+  // 目前只记录日志，返回成功
+  res.json({ success: true, message: 'Cancelled payment recorded' });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running on port ' + PORT));

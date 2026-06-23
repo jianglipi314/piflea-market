@@ -3,7 +3,7 @@
 import { toast } from './utils';
 
 const PI_USER_KEY = 'pi_flea_pi_user_v1';
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://piflea-backend.vercel.app';
+const BACKEND_URL = 'https://piflea-backend.1281582261.workers.dev';
 
 let PiIsAvailable = false;
 let piUser = null;
@@ -131,8 +131,18 @@ export async function authenticateWithPi() {
   try {
     const authResult = await window.Pi.authenticate(
       ['username', 'payments'],
-      function onIncompletePaymentFound(payment) {
-        console.log('Incomplete payment found:', payment);
+      async function onIncompletePaymentFound(payment) {
+        console.log('[Pi SDK] Incomplete payment found:', payment);
+        // 通知后端处理未完成的支付
+        try {
+          await fetch(BACKEND_URL + '/api/incomplete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId: payment.identifier })
+          });
+        } catch (e) {
+          console.error('[Pi SDK] Failed to notify backend about incomplete payment:', e);
+        }
       }
     );
     if (authResult && authResult.user) {
@@ -232,9 +242,9 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     if (onComplete) onComplete(false, '支付超时');
   }, 30000);
 
-  const resetButton = () => {
+  const resetButton = (paymentId, txid) => {
     clearTimeout(timeoutId);
-    if (onComplete) onComplete(true);
+    if (onComplete) onComplete(true, null, paymentId, txid);
   };
 
   const failButton = (msg) => {
@@ -271,12 +281,12 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           }).catch(e => debug('complete err: ' + e, true));
-          resetButton();
+          resetButton(paymentId, txid);
         },
         onCancel: function (paymentId) {
           debug('onCancel: ' + paymentId);
           toast('支付已取消');
-          resetButton();
+          resetButton(paymentId, null);
         },
         onError: function (error, payment) {
           debug('onError: ' + (error?.message || error), true);
