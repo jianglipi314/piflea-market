@@ -257,20 +257,61 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     try {
       window.Pi.createPayment(paymentData, {
         onReadyForServerApproval: function (paymentId) {
+          // ===== DEBUG: 强调试代码开始 =====
+          const debugMsg = '[DEBUG] onReadyForServerApproval triggered! paymentId: ' + paymentId;
+          console.log(debugMsg);
+          alert('回调触发! paymentId: ' + paymentId);
+          const debugDiv = document.createElement('div');
+          debugDiv.style.cssText = 'position:fixed;top:0;left:0;background:red;color:white;z-index:9999;padding:10px;font-size:16px;';
+          debugDiv.textContent = 'APPROVAL回调触发: ' + paymentId;
+          document.body.appendChild(debugDiv);
+          // ===== DEBUG: 强调试代码结束 =====
+
           debug('onReadyForServerApproval: ' + paymentId);
           toast('支付等待确认');
           fetch(BACKEND_URL + '/api/approve', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
-          }).catch(e => debug('approve err: ' + e, true));
+          }).then(r => {
+            console.log('[DEBUG] approve response status:', r.status);
+            alert('approve 响应: ' + r.status);
+            return r.json();
+          }).then(data => {
+            console.log('[DEBUG] approve response data:', data);
+            alert('approve 数据: ' + JSON.stringify(data).slice(0, 200));
+          }).catch(e => {
+            console.error('[DEBUG] approve err:', e);
+            alert('approve 错误: ' + e.message);
+            debug('approve err: ' + e, true);
+          });
         },
         onReadyForServerCompletion: function (paymentId, txid) {
+          // ===== DEBUG: 强调试代码开始 =====
+          const debugMsg = '[DEBUG] onReadyForServerCompletion triggered! paymentId: ' + paymentId + ' txid: ' + txid;
+          console.log(debugMsg);
+          alert('完成回调触发! paymentId: ' + paymentId + ' txid: ' + txid);
+          const debugDiv = document.createElement('div');
+          debugDiv.style.cssText = 'position:fixed;top:40px;left:0;background:green;color:white;z-index:9999;padding:10px;font-size:16px;';
+          debugDiv.textContent = 'COMPLETION回调触发: ' + paymentId;
+          document.body.appendChild(debugDiv);
+          // ===== DEBUG: 强调试代码结束 =====
+
           debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
           toast('✅ 支付完成！');
           fetch(BACKEND_URL + '/api/complete', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
-          }).catch(e => debug('complete err: ' + e, true));
+          }).then(r => {
+            console.log('[DEBUG] complete response status:', r.status);
+            alert('complete 响应: ' + r.status);
+            return r.json();
+          }).then(data => {
+            console.log('[DEBUG] complete response data:', data);
+          }).catch(e => {
+            console.error('[DEBUG] complete err:', e);
+            alert('complete 错误: ' + e.message);
+            debug('complete err: ' + e, true);
+          });
           resetButton();
         },
         onCancel: function (paymentId) {
