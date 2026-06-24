@@ -41,15 +41,16 @@ export function initPiAndAuthenticate(callback) {
         PiIsAvailable = true;
         initCompleted = true;
         const cached = localStorage.getItem(PI_USER_KEY);
-        if (cached) {
+        if (cached && piUser === null) {
           try {
             piUser = JSON.parse(cached);
             debug('Restored cached user: ' + piUser?.username);
-            if (callback) callback(piUser);
+            if (callback) { callback(piUser); return; }
           } catch (e) {
             debug('Failed to parse cached user', true);
           }
         }
+        // 无缓存用户或解析失败时调 callback(null)
         if (callback) callback(null);
       };
       
@@ -91,6 +92,36 @@ function ensureInit() {
   if (initCompleted) {
     debug('Init already completed');
     return Promise.resolve();
+  }
+  
+  // 如果在 Pi Browser 外（window.Pi 不存在），动态加载 SDK
+  if (typeof window.Pi === 'undefined') {
+    debug('window.Pi not found, loading SDK dynamically');
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://sdk.minepi.com/pi-sdk.js';
+      script.onload = () => {
+        debug('Pi SDK loaded dynamically');
+        // SDK 加载后自动初始化
+        try {
+          const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
+          window.Pi.init({ sandbox: isSandbox });
+          PiIsAvailable = true;
+          initCompleted = true;
+          debug('Pi.init() completed after dynamic load');
+        } catch (e) {
+          debug('Pi.init() failed after dynamic load: ' + e, true);
+        }
+        resolve();
+      };
+      script.onerror = () => {
+        debug('Failed to load Pi SDK', true);
+        PiIsAvailable = false;
+        initCompleted = true;
+        resolve();
+      };
+      document.head.appendChild(script);
+    });
   }
   
   // Wait for init to complete with timeout
