@@ -261,7 +261,7 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
       amount: Number(amount),
       memo: memo || 'Piflea payment',
       metadata: { app: 'piflea-market', ...metadata },
-      uid: piUser.uid
+      uid: piUser ? piUser.uid : ('payment-' + Date.now())
     };
     
     debug('Payment data: ' + JSON.stringify(paymentData));
