@@ -3,7 +3,7 @@
 import { toast } from './utils';
 
 const PI_USER_KEY = 'pi_flea_pi_user_v1';
-const BACKEND_URL = 'https://piflea-backend.1281582261.workers.dev';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://piflea-backend.vercel.app';
 
 let PiIsAvailable = false;
 let piUser = null;
@@ -23,36 +23,13 @@ export function initPiAndAuthenticate(callback) {
   debug('initPiAndAuthenticate called, isPiBrowser: ' + isPiBrowser);
 
   if (isPiBrowser) {
-    doInit(callback);
-  } else {
-    // Pi Browser 可能延迟注入 window.Pi，等待最多 3 秒
-    debug('window.Pi not found yet, waiting for Pi Browser injection...');
-    let waited = 0;
-    const checkPi = setInterval(() => {
-      waited += 200;
-      if (typeof window.Pi !== 'undefined') {
-        clearInterval(checkPi);
-        debug('window.Pi found after ' + waited + 'ms');
-        doInit(callback);
-      } else if (waited >= 3000) {
-        clearInterval(checkPi);
-        debug('window.Pi not found after 3s, not in Pi Browser', true);
-        PiIsAvailable = false;
-        initCompleted = true;
-        if (callback) callback(null);
-      }
-    }, 200);
-  }
-}
-
-function doInit(callback) {
-  const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
-  debug('Calling Pi.init(), sandbox: ' + isSandbox);
+    const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
+    debug('Calling Pi.init(), sandbox: ' + isSandbox);
     
     try {
       // Pi.init() may not return a Promise in some versions
-      // 不指定 version，让 SDK 自动使用最新版本
       const initResult = window.Pi.init({
+        version: import.meta.env.VITE_PI_SDK_VERSION || '2.0',
         sandbox: isSandbox
       });
       
@@ -64,16 +41,15 @@ function doInit(callback) {
         PiIsAvailable = true;
         initCompleted = true;
         const cached = localStorage.getItem(PI_USER_KEY);
-        if (cached && piUser === null) {
+        if (cached) {
           try {
             piUser = JSON.parse(cached);
             debug('Restored cached user: ' + piUser?.username);
-            if (callback) { callback(piUser); return; }
+            if (callback) callback(piUser);
           } catch (e) {
             debug('Failed to parse cached user', true);
           }
         }
-        // 无缓存用户或解析失败时调 callback(null)
         if (callback) callback(null);
       };
       
@@ -94,6 +70,18 @@ function doInit(callback) {
       initCompleted = true;
       if (callback) callback(null);
     }
+  } else {
+    debug('Not in Pi Browser, skipping init');
+    PiIsAvailable = false;
+    initCompleted = true;
+    setTimeout(() => { if (callback) callback(null); }, 100);
+  }
+
+  return {
+    isAvailable: () => PiIsAvailable,
+    getUser: () => piUser,
+    waitForInit: () => Promise.resolve()
+  };
 }
 
 /** Wait for Pi.init() to complete before proceeding */
@@ -105,54 +93,22 @@ function ensureInit() {
     return Promise.resolve();
   }
   
-  // 如果在 Pi Browser 外（window.Pi 不存在），动态加载 SDK
-  if (typeof window.Pi === 'undefined') {
-    debug('window.Pi not found, loading SDK dynamically');
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://sdk.minepi.com/pi-sdk.js';
-      script.onload = () => {
-        debug('Pi SDK loaded dynamically');
-        // SDK 加载后自动初始化
-        try {
-          const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
-          window.Pi.init({ sandbox: isSandbox });
-          PiIsAvailable = true;
-          initCompleted = true;
-          debug('Pi.init() completed after dynamic load');
-        } catch (e) {
-          debug('Pi.init() failed after dynamic load: ' + e, true);
-        }
-        resolve();
-      };
-      script.onerror = () => {
-        debug('Failed to load Pi SDK', true);
-        PiIsAvailable = false;
-        initCompleted = true;
-        resolve();
-      };
-      document.head.appendChild(script);
-    });
-  }
-  
   // Wait for init to complete with timeout
   return new Promise((resolve) => {
-    let timeout; // 先声明变量
-    
     const checkInterval = setInterval(() => {
       if (initCompleted) {
         clearInterval(checkInterval);
-        if (timeout) clearTimeout(timeout);
+        clearTimeout(timeout);
         debug('Init completed (waited)');
         resolve();
       }
     }, 100);
     
-    timeout = setTimeout(() => {
+    const timeout = setTimeout(() => {
       clearInterval(checkInterval);
-      debug('ensureInit timeout after 15s', true);
+      debug('ensureInit timeout after 5s', true);
       resolve();
-    }, 15000);
+    }, 5000);
   });
 }
 
@@ -175,18 +131,8 @@ export async function authenticateWithPi() {
   try {
     const authResult = await window.Pi.authenticate(
       ['username', 'payments'],
-      async function onIncompletePaymentFound(payment) {
-        console.log('[Pi SDK] Incomplete payment found:', payment);
-        // 通知后端处理未完成的支付
-        try {
-          await fetch(BACKEND_URL + '/api/incomplete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId: payment.identifier })
-          });
-        } catch (e) {
-          console.error('[Pi SDK] Failed to notify backend about incomplete payment:', e);
-        }
+      function onIncompletePaymentFound(payment) {
+        console.log('Incomplete payment found:', payment);
       }
     );
     if (authResult && authResult.user) {
@@ -286,9 +232,9 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     if (onComplete) onComplete(false, '支付超时');
   }, 30000);
 
-  const resetButton = (paymentId, txid) => {
+  const resetButton = () => {
     clearTimeout(timeoutId);
-    if (onComplete) onComplete(true, null, paymentId, txid);
+    if (onComplete) onComplete(true);
   };
 
   const failButton = (msg) => {
@@ -300,28 +246,18 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     debug('Creating payment...');
     
     const paymentData = {
-      amount: Number(amount),
+      amount: String(amount),
       memo: memo || 'Piflea payment',
       metadata: { app: 'piflea-market', ...metadata },
-      uid: piUser ? piUser.uid : ('payment-' + Date.now())
+      uid: piUser.uid,
     };
     
     debug('Payment data: ' + JSON.stringify(paymentData));
-    debug('Payment data types - amount: ' + typeof paymentData.amount + ', amount value: ' + paymentData.amount);
-
-    // 验证 amount 是否为有效数字
-    if (isNaN(paymentData.amount) || paymentData.amount <= 0) {
-      debug('Invalid amount: ' + paymentData.amount, true);
-      toast('支付金额无效');
-      failButton('支付金额无效');
-      return;
-    }
 
     try {
-      debug('About to call window.Pi.createPayment...');
       window.Pi.createPayment(paymentData, {
         onReadyForServerApproval: function (paymentId) {
-          debug('onReadyForServerApproval called! paymentId: ' + paymentId);
+          debug('onReadyForServerApproval: ' + paymentId);
           toast('支付等待确认');
           fetch(BACKEND_URL + '/api/approve', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -335,12 +271,12 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           }).catch(e => debug('complete err: ' + e, true));
-          resetButton(paymentId, txid);
+          resetButton();
         },
         onCancel: function (paymentId) {
           debug('onCancel: ' + paymentId);
           toast('支付已取消');
-          resetButton(paymentId, null);
+          resetButton();
         },
         onError: function (error, payment) {
           debug('onError: ' + (error?.message || error), true);
