@@ -23,8 +23,31 @@ export function initPiAndAuthenticate(callback) {
   debug('initPiAndAuthenticate called, isPiBrowser: ' + isPiBrowser);
 
   if (isPiBrowser) {
-    const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
-    debug('Calling Pi.init(), sandbox: ' + isSandbox);
+    doInit(callback);
+  } else {
+    // Pi Browser 可能延迟注入 window.Pi，等待最多 3 秒
+    debug('window.Pi not found yet, waiting for Pi Browser injection...');
+    let waited = 0;
+    const checkPi = setInterval(() => {
+      waited += 200;
+      if (typeof window.Pi !== 'undefined') {
+        clearInterval(checkPi);
+        debug('window.Pi found after ' + waited + 'ms');
+        doInit(callback);
+      } else if (waited >= 3000) {
+        clearInterval(checkPi);
+        debug('window.Pi not found after 3s, not in Pi Browser', true);
+        PiIsAvailable = false;
+        initCompleted = true;
+        if (callback) callback(null);
+      }
+    }, 200);
+  }
+}
+
+function doInit(callback) {
+  const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
+  debug('Calling Pi.init(), sandbox: ' + isSandbox);
     
     try {
       // Pi.init() may not return a Promise in some versions
@@ -71,18 +94,6 @@ export function initPiAndAuthenticate(callback) {
       initCompleted = true;
       if (callback) callback(null);
     }
-  } else {
-    debug('Not in Pi Browser, skipping init');
-    PiIsAvailable = false;
-    initCompleted = true;
-    setTimeout(() => { if (callback) callback(null); }, 100);
-  }
-
-  return {
-    isAvailable: () => PiIsAvailable,
-    getUser: () => piUser,
-    waitForInit: () => Promise.resolve()
-  };
 }
 
 /** Wait for Pi.init() to complete before proceeding */

@@ -257,14 +257,14 @@ export function updatePiButtonState() {
 
   const user = getPiUser();
   const username = user ? (user.username || ('pi_' + (user.uid || '').slice(0, 8))) : null;
-  // Pi Browser injects window.Pi natively
-  const Pi = typeof window.Pi !== 'undefined';
+  // 同时检查 window.Pi 和 PiIsAvailable（SDK 可能已初始化但 window.Pi 注入延迟）
+  const hasPi = typeof window.Pi !== 'undefined';
 
   if (user && username) {
     btn.textContent = '已登录: @' + username;
     btn.style.opacity = '1';
     btn.onclick = piLogout;
-  } else if (Pi) {
+  } else if (hasPi) {
     btn.textContent = 'Pi 登录';
     btn.style.opacity = '1';
     btn.onclick = piLogin;
