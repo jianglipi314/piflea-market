@@ -3,7 +3,7 @@
 import { toast } from './utils';
 
 const PI_USER_KEY = 'pi_flea_pi_user_v1';
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://piflea-backend.vercel.app';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://piflea-backend.1281582261.workers.dev';
 
 let PiIsAvailable = false;
 let piUser = null;
