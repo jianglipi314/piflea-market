@@ -39,8 +39,9 @@ function errorResponse(message, status = 400, code = 'error', env) {
 // 调用 Pi Platform API（使用 Server API Key）
 async function piPlatformRequest(path, method = 'GET', body = null, env) {
   const url = `${PLATFORM_API_URL}${path}`;
+  const piApiKey = env.PI_API_KEY;
   const headers = {
-    'Authorization': `Key ${env.PI_API_KEY}`,
+    'Authorization': `Key ${piApiKey}`,
     'Content-Type': 'application/json',
   };
   const options = { method, headers };
@@ -59,10 +60,12 @@ async function piPlatformRequest(path, method = 'GET', body = null, env) {
 // 你也可以在 Workers 里用 @supabase/supabase-js
 
 async function supabaseRequest(path, method, body, env) {
-  const url = `${env.SUPABASE_URL}/rest/v1${path}`;
+  const supabaseUrl = env.SUPABASE_URL || 'https://xiuzymzcjkbhkzffojiw.supabase.co';
+  const supabaseKey = env.SUPABASE_KEY;
+  const url = `${supabaseUrl}/rest/v1${path}`;
   const headers = {
-    'apikey': env.SUPABASE_KEY,
-    'Authorization': `Bearer ${env.SUPABASE_KEY}`,
+    'apikey': supabaseKey,
+    'Authorization': `Bearer ${supabaseKey}`,
     'Content-Type': 'application/json',
     'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal',
   };
