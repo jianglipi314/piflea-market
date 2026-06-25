@@ -384,11 +384,13 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  box-shadow: var(--shadow);
-  background: rgba(255, 255, 255, 0.92);
-  color: #333;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
   border: none;
   cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .hero .back { left: 14px; }

@@ -73,6 +73,25 @@ export function switchMine(tab) {
   const orderList = document.getElementById('orderList');
   const orderEmpty = document.getElementById('orderEmpty');
 
+  // 控制"子页面"模式：非 post tab 时显示返回栏，隐藏个人信息和 tabs
+  const backBar = document.getElementById('mine-back-bar');
+  const profile = document.getElementById('mine-profile');
+  const wallet = document.getElementById('mine-wallet');
+  const tabs = document.getElementById('mine-tabs');
+  const setting = document.querySelector('#view-mine .setting');
+  const backTitle = document.getElementById('mine-back-title');
+
+  const isSubPage = tab !== 'post';
+  if (backBar) backBar.style.display = isSubPage ? 'flex' : 'none';
+  if (profile) profile.style.display = isSubPage ? 'none' : '';
+  if (wallet) wallet.style.display = isSubPage ? 'none' : '';
+  if (tabs) tabs.style.display = isSubPage ? 'none' : '';
+  if (setting) setting.style.display = isSubPage ? 'none' : '';
+  if (backTitle) {
+    const titleMap = { buy: '我的购买', sell: '我的出售', hist: '浏览记录', post: '我的' };
+    backTitle.textContent = titleMap[tab] || '我的';
+  }
+
   if (tab === 'buy' || tab === 'sell') {
     // 显示订单相关容器，隐藏我的发布/浏览记录容器
     mineLoader.style.display = 'none';
@@ -376,7 +395,7 @@ export async function loadOrders(role) {
       return;
     }
 
-    const statusMap = { 'paid': '待发货', 'shipped': '已发货', 'completed': '已完成' };
+    const statusMap = { 'approved': '支付中', 'paid': '待发货', 'shipped': '已发货', 'completed': '已完成' };
 
     // 缓存订单数据，详情页使用
     cachedOrders[role] = orders;

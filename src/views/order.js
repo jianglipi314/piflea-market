@@ -28,6 +28,10 @@ export function openOrder(id) {
   document.getElementById('view-order').classList.add('active');
   document.querySelectorAll('.nav button').forEach((b) => b.classList.remove('on'));
 
+  // 更新顶部标题
+  document.getElementById('topTitle').textContent = '确认订单';
+  document.getElementById('topSub').textContent = '请核对商品信息后支付';
+
   // 兜底：确保返回按钮事件绑定有效
   const backBtn = document.getElementById('o-back-btn');
   if (backBtn) {
@@ -119,10 +123,17 @@ export function confirmPayment() {
   const platformFee = FEE_MODE === 'A' ? 0 : (FEE_MODE === 'B' ? price * PLATFORM_FEE_RATE : 0);
   const total = price + platformFee + NETWORK_FEE;
 
+  const piUser = getPiUser();
   createPiPayment(
     total,
     'Piflea: ' + currentOrderItem.title,
-    { itemId: currentOrderItem.id, seller: currentOrderItem.seller, mode: FEE_MODE },
+    {
+      itemId: currentOrderItem.id,
+      seller: currentOrderItem.seller,
+      mode: FEE_MODE,
+      buyerId: piUser ? piUser.uid : null,
+      sellerId: currentOrderItem.owner_id || null,
+    },
     function(success, msg, paymentId, txid) {
       btn.disabled = false;
       btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';

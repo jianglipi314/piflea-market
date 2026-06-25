@@ -44,8 +44,8 @@ html[data-dark="1"] .rules b {
 
 html[data-dark="1"] .hero .back,
 html[data-dark="1"] .hero .share {
-  background: #2c3250;
-  color: #eef0fa;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
 }
 
 html[data-dark="1"] .list .row-item .rm {
