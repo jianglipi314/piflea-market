@@ -13,4 +13,5 @@ compatibility_date = "2024-01-01"
 [vars]
 FRONTEND_URL = "https://piflea.com"
 SUPABASE_URL = "https://xiuzymzcjkbhkzffojiw.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_6Ep5bW6y4ttuyLrd9PLObw_Q7fpvFmS"
 # SUPABASE_KEY 和 PI_API_KEY 通过 secret 设置（见下方说明）

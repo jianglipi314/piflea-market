@@ -60,11 +60,12 @@ async function piPlatformRequest(path, method = 'GET', body = null, env) {
 // 你也可以在 Workers 里用 @supabase/supabase-js
 
 async function supabaseRequest(path, method, body, env) {
-  const supabaseUrl = env.SUPABASE_URL || 'https://xiuzymzcjkbhkzffojiw.supabase.co';
+  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY;
   const supabaseKey = env.SUPABASE_KEY;
   const url = `${supabaseUrl}/rest/v1${path}`;
   const headers = {
-    'apikey': supabaseKey,
+    'apikey': supabaseAnonKey,
     'Authorization': `Bearer ${supabaseKey}`,
     'Content-Type': 'application/json',
     'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal',
@@ -152,8 +153,8 @@ async function handleApprove(request, env) {
     const orderData = {
       payment_id: paymentId,
       product_id: payment.data?.metadata?.productId || payment.data?.metadata?.itemId || null,
-      buyer_uid: payment.data?.metadata?.buyerId || null,
-      seller_uid: payment.data?.metadata?.sellerId || null,
+      buyer_id: payment.data?.metadata?.buyerId || null,
+      seller_id: payment.data?.metadata?.sellerId || null,
       amount: payment.data?.amount?.value || 0,
       memo: payment.data?.memo || '',
       status: 'approved',
@@ -385,11 +386,11 @@ async function handleMyOrders(request, env) {
 
     let query = `/orders?`;
     if (role === 'buyer') {
-      query += `buyer_uid=eq.${encodeURIComponent(uid)}`;
+      query += `buyer_id=eq.${encodeURIComponent(uid)}`;
     } else if (role === 'seller') {
-      query += `seller_uid=eq.${encodeURIComponent(uid)}`;
+      query += `seller_id=eq.${encodeURIComponent(uid)}`;
     } else {
-      query += `or=(buyer_uid.eq.${encodeURIComponent(uid)},seller_uid.eq.${encodeURIComponent(uid)})`;
+      query += `or=(buyer_id.eq.${encodeURIComponent(uid)},seller_id.eq.${encodeURIComponent(uid)})`;
     }
     query += '&order=created_at.desc&limit=50';
 
@@ -414,7 +415,7 @@ async function handleCompleteOrder(request, env) {
     }
 
     const orders = await supabaseRequest(
-      `/orders?id=eq.${order_id}&buyer_uid=eq.${encodeURIComponent(buyer_id)}&limit=1`,
+      `/orders?id=eq.${order_id}&buyer_id=eq.${encodeURIComponent(buyer_id)}&limit=1`,
       'GET', null, env
     );
     if (!orders || !orders.length) {
@@ -442,7 +443,7 @@ async function handleMarkShipped(request, env) {
     }
 
     const orders = await supabaseRequest(
-      `/orders?id=eq.${order_id}&seller_uid=eq.${encodeURIComponent(seller_id)}&limit=1`,
+      `/orders?id=eq.${order_id}&seller_id=eq.${encodeURIComponent(seller_id)}&limit=1`,
       'GET', null, env
     );
     if (!orders || !orders.length) {
@@ -469,8 +470,8 @@ async function handleCreateOrder(request, env) {
 
     const orderData = {
       payment_id: payment_id || null,
-      buyer_uid: buyer_id,
-      seller_uid: seller_id,
+      buyer_id: buyer_id,
+      seller_id: seller_id,
       product_id: item_id,
       item_title: item_title || '',
       item_price: item_price || 0,
