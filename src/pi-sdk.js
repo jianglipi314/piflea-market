@@ -46,6 +46,11 @@ export function initPiAndAuthenticate(callback) {
             piUser = JSON.parse(cached);
             debug('Restored cached user: ' + piUser?.username);
             if (callback) callback(piUser);
+
+            // 静默重新认证，确保获取 payments scope
+            // 如果 Pi SDK 已有完整权限（含 payments），这次调用不会弹框
+            // 如果缺少 payments scope，Pi SDK 会弹框请求
+            silentReAuth();
           } catch (e) {
             debug('Failed to parse cached user', true);
           }
@@ -152,6 +157,36 @@ export async function authenticateWithPi() {
     toast('登录失败：' + (error?.message || JSON.stringify(error)));
     return null;
   }
+}
+
+/**
+ * Silent re-authentication to ensure payments scope.
+ * Does not logout first - just calls authenticate with payments scope.
+ * If user already has payments scope, no popup appears.
+ * If user lacks payments scope, Pi SDK will show the auth dialog.
+ */
+function silentReAuth() {
+  if (!window.Pi || typeof window.Pi.authenticate !== 'function') return;
+
+  window.Pi.authenticate(
+    ['username', 'payments'],
+    function onIncompletePaymentFound(payment) {
+      console.log('[silentReAuth] Incomplete payment found:', payment);
+    }
+  ).then(function(authResult) {
+    if (authResult && authResult.user) {
+      console.log('[silentReAuth] Success, got payments scope for:', authResult.user.username);
+      piUser = {
+        uid: authResult.user.uid,
+        username: authResult.user.username,
+        accessToken: authResult.accessToken,
+      };
+      localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
+    }
+  }).catch(function(err) {
+    // 用户拒绝或网络问题，不影响正常使用
+    console.log('[silentReAuth] Failed (user may have declined):', err?.message || err);
+  });
 }
 
 /**
