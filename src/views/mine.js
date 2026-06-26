@@ -54,8 +54,38 @@ export function renderMine() {
     ? '∞'
     : '100.0';
 
-  // Tab
-  switchMine(state.mineTab || 'post');
+  // 默认显示概览页（不直接进入任何 tab）
+  showMineOverview();
+}
+
+export function showMineOverview() {
+  // 隐藏所有子页面内容
+  const mineLoader = document.getElementById('mineLoader');
+  const mineList = document.getElementById('mine-list');
+  const mineEmpty = document.getElementById('mine-empty');
+  const orderLoader = document.getElementById('orderLoader');
+  const orderList = document.getElementById('orderList');
+  const orderEmpty = document.getElementById('orderEmpty');
+
+  if (mineLoader) mineLoader.style.display = 'none';
+  if (mineList) mineList.style.display = 'none';
+  if (mineEmpty) mineEmpty.style.display = 'none';
+  if (orderLoader) orderLoader.style.display = 'none';
+  if (orderList) orderList.style.display = 'none';
+  if (orderEmpty) orderEmpty.style.display = 'none';
+
+  // 显示概览元素
+  const backBar = document.getElementById('mine-back-bar');
+  const profile = document.getElementById('mine-profile');
+  const wallet = document.getElementById('mine-wallet');
+  const tabs = document.getElementById('mine-tabs');
+  const setting = document.querySelector('#view-mine .setting');
+
+  if (backBar) backBar.style.display = 'none';
+  if (profile) profile.style.display = '';
+  if (wallet) wallet.style.display = '';
+  if (tabs) tabs.style.display = '';
+  if (setting) setting.style.display = '';
 }
 
 /**
@@ -73,7 +103,7 @@ export function switchMine(tab) {
   const orderList = document.getElementById('orderList');
   const orderEmpty = document.getElementById('orderEmpty');
 
-  // 控制"子页面"模式：非 post tab 时显示返回栏，隐藏个人信息和 tabs
+  // 所有 tab 都进入子页面模式：隐藏概览信息，显示返回栏
   const backBar = document.getElementById('mine-back-bar');
   const profile = document.getElementById('mine-profile');
   const wallet = document.getElementById('mine-wallet');
@@ -81,14 +111,13 @@ export function switchMine(tab) {
   const setting = document.querySelector('#view-mine .setting');
   const backTitle = document.getElementById('mine-back-title');
 
-  const isSubPage = tab !== 'post';
-  if (backBar) backBar.style.display = isSubPage ? 'flex' : 'none';
-  if (profile) profile.style.display = isSubPage ? 'none' : '';
-  if (wallet) wallet.style.display = isSubPage ? 'none' : '';
-  if (tabs) tabs.style.display = isSubPage ? 'none' : '';
-  if (setting) setting.style.display = isSubPage ? 'none' : '';
+  if (backBar) backBar.style.display = 'flex';
+  if (profile) profile.style.display = 'none';
+  if (wallet) wallet.style.display = 'none';
+  if (tabs) tabs.style.display = 'none';
+  if (setting) setting.style.display = 'none';
   if (backTitle) {
-    const titleMap = { buy: '我的购买', sell: '我的出售', hist: '浏览记录', post: '我的' };
+    const titleMap = { post: '我的发布', buy: '我的购买', sell: '我的出售', hist: '浏览记录' };
     backTitle.textContent = titleMap[tab] || '我的';
   }
 

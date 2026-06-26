@@ -22,6 +22,7 @@ import { loadChatList, openChatByKey, sendMsg, checkChatTable } from './views/ch
 import {
   renderMine,
   switchMine,
+  showMineOverview,
   editMyName,
   toggleAdmin,
   piLogin,
@@ -129,6 +130,7 @@ window.checkChatTable = checkChatTable;
 
 // Mine
 window.switchMine = switchMine;
+window.showMineOverview = showMineOverview;
 window.editMyName = editMyName;
 window.toggleAdmin = toggleAdmin;
 window.piLogin = piLogin;

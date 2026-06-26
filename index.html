@@ -242,7 +242,7 @@
   <!-- Mine -->
   <section class="view" id="view-mine">
     <div id="mine-back-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--card)">
-      <button class="icon-btn" onclick="window.switchMine('post')" style="min-width:36px;width:36px;height:36px;font-size:24px">‹</button>
+      <button class="icon-btn" onclick="window.showMineOverview()" style="min-width:36px;width:36px;height:36px;font-size:24px">‹</button>
       <div style="font-weight:700;font-size:16px" id="mine-back-title">我的</div>
     </div>
     <div class="profile" id="mine-profile">
@@ -254,9 +254,9 @@
       <button class="edit" onclick="editMyName()">编辑昵称</button>
     </div>
     <div class="wallet" id="mine-wallet">
-      <div class="cell"><div class="n" id="m-post">0</div><div class="l">我的发布</div></div>
-      <div class="cell"><div class="n" id="m-view">0</div><div class="l">总浏览</div></div>
-      <div class="cell"><div class="n" id="m-pi">100.0</div><div class="l">钱包 π</div></div>
+      <div class="cell" style="cursor:pointer" onclick="window.switchMine('post')"><div class="n" id="m-post">0</div><div class="l">我的发布</div></div>
+      <div class="cell" style="cursor:pointer" onclick="window.switchMine('buy')"><div class="n" id="m-view">0</div><div class="l">总浏览</div></div>
+      <div class="cell" style="cursor:pointer" onclick="window.switchMine('sell')"><div class="n" id="m-pi">100.0</div><div class="l">钱包 π</div></div>
     </div>
     <div class="tabs" id="mine-tabs">
       <button class="tab on" id="tab-post">我的发布</button>
