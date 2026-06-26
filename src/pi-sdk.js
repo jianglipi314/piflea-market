@@ -195,7 +195,7 @@ export function getPiUser() {
  * Create a Pi payment.
  * createPayment 是同步方法，不返回 Promise，通过 callbacks 通知结果
  */
-export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
+export function createPiPayment(amount, memo, metadata = {}, onComplete) {
   debug('createPiPayment called, amount: ' + amount);
 
   if (!window.Pi) {
@@ -205,8 +205,6 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
     return;
   }
 
-  debug('window.Pi exists: true');
-
   if (typeof window.Pi.createPayment !== 'function') {
     debug('window.Pi.createPayment is not a function', true);
     toast('Pi SDK createPayment 不可用');
@@ -214,27 +212,8 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
     return;
   }
 
-  debug('window.Pi.createPayment is available');
-
-  // 强制重新认证，确保获取 payments scope
-  // Pi SDK 不会自动重新请求已拒绝的 scope，必须先 logout 再 authenticate
-  debug('Re-authenticating to ensure payments scope...');
-  try {
-    const auth = await authenticateWithPi();
-    if (!auth) {
-      debug('Re-authentication failed', true);
-      if (onComplete) onComplete(false, '登录失败，无法创建支付');
-      return;
-    }
-  } catch (err) {
-    debug('Re-authentication error: ' + err.message, true);
-    toast('需要授权支付权限才能购买商品，请退出重新登录');
-    if (onComplete) onComplete(false, '登录失败：' + err.message);
-    return;
-  }
-
   if (!piUser) {
-    debug('piUser still null after auth', true);
+    debug('piUser is null, user not logged in', true);
     toast('请先登录 Pi 账号');
     if (onComplete) onComplete(false, '请先登录 Pi 账号');
     return;
@@ -242,7 +221,7 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
 
   debug('User logged in: ' + piUser.username);
 
-  // Timeout to prevent hanging - if no callback fires within 30s, reset the button
+  // Timeout to prevent hanging
   let timeoutId = setTimeout(() => {
     debug('Payment timeout - no callback fired within 30s', true);
     toast('支付超时，请重试');
@@ -259,8 +238,7 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
     if (onComplete) onComplete(false, msg);
   };
 
-  try {
-    await ensureInit();
+  ensureInit().then(() => {
     debug('Creating payment...');
 
     const paymentData = {
@@ -269,43 +247,29 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
       metadata: { app: 'piflea-market', ...metadata },
       uid: piUser.uid,
     };
-    
-    debug('Payment data: ' + JSON.stringify(paymentData));
 
     try {
       window.Pi.createPayment(paymentData, {
         onReadyForServerApproval: function (paymentId) {
           console.log('[DEBUG] onReadyForServerApproval triggered! paymentId:', paymentId);
-
           debug('onReadyForServerApproval: ' + paymentId);
           toast('支付等待确认');
           fetch(BACKEND_URL + '/api/approve', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
-          }).then(r => {
-            console.log('[DEBUG] approve response status:', r.status);
-            return r.json();
-          }).then(data => {
-            console.log('[DEBUG] approve response data:', data);
-          }).catch(e => {
+          }).then(r => r.json()).catch(e => {
             console.error('[DEBUG] approve err:', e);
             debug('approve err: ' + e, true);
           });
         },
         onReadyForServerCompletion: function (paymentId, txid) {
           console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid);
-
           debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
           toast('✅ 支付完成！');
           fetch(BACKEND_URL + '/api/complete', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
-          }).then(r => {
-            console.log('[DEBUG] complete response status:', r.status);
-            return r.json();
-          }).then(data => {
-            console.log('[DEBUG] complete response data:', data);
-          }).catch(e => {
+          }).then(r => r.json()).catch(e => {
             console.error('[DEBUG] complete err:', e);
             debug('complete err: ' + e, true);
           });
@@ -317,9 +281,18 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
           resetButton();
         },
         onError: function (error, payment) {
-          debug('onError: ' + (error?.message || error), true);
-          toast('支付失败：' + (error?.message || '未知错误'));
-          failButton(error?.message || '支付失败');
+          const msg = error?.message || error || '未知错误';
+          debug('onError: ' + msg, true);
+
+          // 检测是否缺少 payments scope
+          const noPermission = msg.includes('payments') || msg.includes('permission') || msg.includes('scope') || msg.includes('unauthorized');
+          if (noPermission) {
+            toast('缺少支付权限，请退出账号后重新登录并勾选 payments 权限');
+            failButton('缺少支付权限，请退出账号后重新登录');
+          } else {
+            toast('支付失败：' + msg);
+            failButton(msg);
+          }
         },
       });
 
@@ -329,9 +302,9 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
       toast('支付异常：' + e.message);
       failButton(e.message);
     }
-  } catch (e) {
-    debug('ensureInit or createPayment error: ' + e.message, true);
+  }).catch(e => {
+    debug('ensureInit error: ' + e.message, true);
     toast('Pi SDK 初始化失败：' + e.message);
     failButton('Pi SDK 初始化失败');
-  }
+  });
 }
