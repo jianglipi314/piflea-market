@@ -216,21 +216,21 @@ export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
 
   debug('window.Pi.createPayment is available');
 
-  // 确保有 payments scope：如果没有用户或不确定权限，重新 authenticate
-  if (!piUser) {
-    debug('piUser is null, re-authenticating with payments scope...');
-    try {
-      const auth = await authenticateWithPi();
-      if (!auth) {
-        debug('Re-authentication failed', true);
-        if (onComplete) onComplete(false, '登录失败，无法创建支付');
-        return;
-      }
-    } catch (err) {
-      debug('Re-authentication error: ' + err.message, true);
-      if (onComplete) onComplete(false, '登录失败：' + err.message);
+  // 强制重新认证，确保获取 payments scope
+  // Pi SDK 不会自动重新请求已拒绝的 scope，必须先 logout 再 authenticate
+  debug('Re-authenticating to ensure payments scope...');
+  try {
+    const auth = await authenticateWithPi();
+    if (!auth) {
+      debug('Re-authentication failed', true);
+      if (onComplete) onComplete(false, '登录失败，无法创建支付');
       return;
     }
+  } catch (err) {
+    debug('Re-authentication error: ' + err.message, true);
+    toast('需要授权支付权限才能购买商品，请退出重新登录');
+    if (onComplete) onComplete(false, '登录失败：' + err.message);
+    return;
   }
 
   if (!piUser) {
