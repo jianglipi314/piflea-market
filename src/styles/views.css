@@ -359,6 +359,7 @@
   height: 280px;
   background: linear-gradient(135deg, #f0f3fa, #fef0ea);
   border-radius: 0 0 18px 18px;
+  position: relative;
   display: grid;
   place-items: center;
   font-size: 90px;
