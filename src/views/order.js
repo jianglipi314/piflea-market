@@ -137,7 +137,7 @@ export function confirmPayment() {
     function(success, msg, paymentId, txid) {
       btn.disabled = false;
       btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
-      // 二次校验：必须有 paymentId 和 txid 才创建订单
+      // \u4E8C\u6B21\u6821\u9A8C\uFF1A\u5FC5\u987B\u6709 paymentId \u548C txid \u624D\u521B\u5EFA\u8BA2\u5355
       if (success && paymentId && txid) {
         // Save order to database
         createOrder(paymentId, txid);
@@ -147,6 +147,10 @@ export function confirmPayment() {
         toast('\u652F\u4ED8\u5931\u8D25\uFF1A' + msg);
       }
     }
-  );
+  ).catch(function(err) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    console.error('createPiPayment error:', err);
+  });
 }
 

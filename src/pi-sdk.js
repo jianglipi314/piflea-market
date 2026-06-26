@@ -195,34 +195,51 @@ export function getPiUser() {
  * Create a Pi payment.
  * createPayment 是同步方法，不返回 Promise，通过 callbacks 通知结果
  */
-export function createPiPayment(amount, memo, metadata = {}, onComplete) {
+export async function createPiPayment(amount, memo, metadata = {}, onComplete) {
   debug('createPiPayment called, amount: ' + amount);
-  
+
   if (!window.Pi) {
     debug('window.Pi is undefined', true);
     toast('Pi SDK 不可用');
     if (onComplete) onComplete(false, 'Pi SDK 不可用');
     return;
   }
-  
+
   debug('window.Pi exists: true');
-  
+
   if (typeof window.Pi.createPayment !== 'function') {
     debug('window.Pi.createPayment is not a function', true);
     toast('Pi SDK createPayment 不可用');
     if (onComplete) onComplete(false, 'Pi SDK createPayment 不可用');
     return;
   }
-  
+
   debug('window.Pi.createPayment is available');
-  
+
+  // 确保有 payments scope：如果没有用户或不确定权限，重新 authenticate
   if (!piUser) {
-    debug('piUser is null, user not logged in', true);
+    debug('piUser is null, re-authenticating with payments scope...');
+    try {
+      const auth = await authenticateWithPi();
+      if (!auth) {
+        debug('Re-authentication failed', true);
+        if (onComplete) onComplete(false, '登录失败，无法创建支付');
+        return;
+      }
+    } catch (err) {
+      debug('Re-authentication error: ' + err.message, true);
+      if (onComplete) onComplete(false, '登录失败：' + err.message);
+      return;
+    }
+  }
+
+  if (!piUser) {
+    debug('piUser still null after auth', true);
     toast('请先登录 Pi 账号');
     if (onComplete) onComplete(false, '请先登录 Pi 账号');
     return;
   }
-  
+
   debug('User logged in: ' + piUser.username);
 
   // Timeout to prevent hanging - if no callback fires within 30s, reset the button
@@ -242,9 +259,10 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     if (onComplete) onComplete(false, msg);
   };
 
-  ensureInit().then(() => {
+  try {
+    await ensureInit();
     debug('Creating payment...');
-    
+
     const paymentData = {
       amount: String(amount),
       memo: memo || 'Piflea payment',
@@ -304,16 +322,16 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
           failButton(error?.message || '支付失败');
         },
       });
-      
+
       debug('createPayment called successfully');
     } catch (e) {
       debug('createPayment exception: ' + e.message, true);
       toast('支付异常：' + e.message);
       failButton(e.message);
     }
-  }).catch(e => {
-    debug('ensureInit error: ' + e.message, true);
+  } catch (e) {
+    debug('ensureInit or createPayment error: ' + e.message, true);
     toast('Pi SDK 初始化失败：' + e.message);
     failButton('Pi SDK 初始化失败');
-  });
+  }
 }
