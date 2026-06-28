@@ -10,7 +10,7 @@
  * - WALLET_PRIVATE_SEED: 开发者钱包私钥（S 开头，用于 A2U 自动转账）
  */
 
-import { Keypair, Horizon, Operation, Asset, TransactionBuilder, Memo, Networks, StrKey } from '@stellar/stellar-sdk';
+import { Keypair, Operation, Asset, TransactionBuilder, Memo, StrKey, Networks } from '@stellar/stellar-base';
 
 // ============ 常量 ============
 const PLATFORM_API_URL = 'https://api.minepi.com';
@@ -605,17 +605,35 @@ async function handleTransferToSeller(request, env) {
     }
     console.log('[A2U] From:', fromAddress, '→ To:', toAddress, 'Network:', network);
 
-    // 8. 构建 Stellar 交易
+    // 8. 构建 Stellar 交易（用 fetch 直接调用 Horizon API）
     const horizonConfig = getPiHorizonConfig(network);
-    const piHorizon = new Horizon.Server(horizonConfig.url);
+    const horizonUrl = horizonConfig.url;
+    const publicKey = keypair.publicKey();
 
-    const sourceAccount = await piHorizon.loadAccount(keypair.publicKey());
-    const baseFee = await piHorizon.fetchBaseFee();
+    // 8a. 加载账户（获取 sequence number）
+    const accountRes = await fetch(`${horizonUrl}/accounts/${publicKey}`);
+    if (!accountRes.ok) throw new Error('Failed to load account: ' + await accountRes.text());
+    const accountData = await accountRes.json();
+    const sourceAccount = { accountId: () => publicKey, sequenceNumber: () => accountData.sequence };
 
+    // 8b. 获取基础手续费
+    const feeRes = await fetch(`${horizonUrl}/fee_stats`);
+    const feeData = await feeRes.json();
+    const baseFee = feeData.last_ledger_base_fee;
+
+    // 8c. 获取时间边界
+    const ledgerRes = await fetch(`${horizonUrl}/ledgers?order=desc&limit=1`);
+    const ledgerData = await ledgerRes.json();
+    const latestLedger = ledgerData._embedded.records[0];
+    const now = Math.floor(Date.now() / 1000);
+    const minTime = 0;
+    const maxTime = now + PI_HORIZON_DEFAULT_TIMEBOUNDS;
+
+    // 8d. 构建交易
     const transaction = new TransactionBuilder(sourceAccount, {
-      fee: baseFee.toString(),
+      fee: baseFee,
       networkPassphrase: horizonConfig.passphrase,
-      timebounds: await piHorizon.fetchTimebounds(PI_HORIZON_DEFAULT_TIMEBOUNDS),
+      timebounds: { minTime, maxTime },
     })
       .addOperation(Operation.payment({
         destination: toAddress,
@@ -629,10 +647,17 @@ async function handleTransferToSeller(request, env) {
     transaction.sign(keypair);
     console.log('[A2U] Transaction signed, submitting to Pi blockchain...');
 
-    // 10. 提交到 Pi 链
-    const horizonResponse = await piHorizon.submitTransaction(transaction);
-    // @ts-ignore — Stellar SDK 返回类型中 id 可能未正确标注
-    const a2uTxid = horizonResponse.id || horizonResponse.hash;
+    // 10. 提交到 Pi 链（通过 Horizon REST API）
+    const submitRes = await fetch(`${horizonUrl}/transactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'tx=' + encodeURIComponent(transaction.toXDR()),
+    });
+    const submitData = await submitRes.json();
+    if (!submitRes.ok) {
+      throw new Error('Transaction submit failed: ' + JSON.stringify(submitData));
+    }
+    const a2uTxid = submitData.id || submitData.hash;
     console.log('[A2U] Transaction submitted, txid:', a2uTxid);
 
     // 11. 调用 Pi Platform API 完成 A2U 支付
