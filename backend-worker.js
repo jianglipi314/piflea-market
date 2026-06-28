@@ -7,10 +7,20 @@
  * - PLATFORM_API_URL: https://api.minepi.com (或测试网 URL)
  * - FRONTEND_URL: https://piflea.com
  * - SUPABASE_URL / SUPABASE_KEY: 数据库连接
+ * - WALLET_PRIVATE_SEED: 开发者钱包私钥（S 开头，用于 A2U 自动转账）
  */
+
+import { Keypair, Horizon, Operation, Asset, TransactionBuilder, Memo, Networks, StrKey } from '@stellar/stellar-sdk';
 
 // ============ 常量 ============
 const PLATFORM_API_URL = 'https://api.minepi.com';
+
+// Pi 链 Horizon 配置（来自 pi-nodejs 官方 .env.production）
+const PI_HORIZON_TESTNET_URL = 'https://api.testnet.minepi.com';
+const PI_HORIZON_TESTNET_PASSPHRASE = 'Pi Testnet';
+const PI_HORIZON_MAINNET_URL = 'https://api.mainnet.minepi.com';
+const PI_HORIZON_MAINNET_PASSPHRASE = 'Pi Network';
+const PI_HORIZON_DEFAULT_TIMEBOUNDS = 180; // 秒
 
 // CORS 处理：根据环境变量动态设置允许的域名
 function getCorsHeaders(env) {
@@ -492,6 +502,175 @@ async function handleCreateOrder(request, env) {
   }
 }
 
+// ============ A2U (App-to-User) 自动转账 ============
+// 参考 Pi 官方 pi-nodejs SDK: https://github.com/pi-apps/pi-nodejs
+
+function getPiHorizonConfig(networkPassphrase) {
+  if (networkPassphrase === PI_HORIZON_MAINNET_PASSPHRASE) {
+    return { url: PI_HORIZON_MAINNET_URL, passphrase: PI_HORIZON_MAINNET_PASSPHRASE };
+  }
+  return { url: PI_HORIZON_TESTNET_URL, passphrase: PI_HORIZON_TESTNET_PASSPHRASE };
+}
+
+// 9. POST /api/transfer-to-seller — A2U 自动转账给卖家
+async function handleTransferToSeller(request, env) {
+  try {
+    const { order_id, buyer_id } = await request.json();
+    if (!order_id) {
+      return errorResponse('order_id required', 400, 'missing_params', env);
+    }
+
+    // 1. 查询订单（验证买家身份）
+    const query = buyer_id
+      ? `/orders?id=eq.${order_id}&buyer_id=eq.${encodeURIComponent(buyer_id)}&limit=1`
+      : `/orders?id=eq.${order_id}&limit=1`;
+    const orders = await supabaseRequest(query, 'GET', null, env);
+    if (!orders || !orders.length) {
+      return errorResponse('Order not found', 404, 'not_found', env);
+    }
+    const order = orders[0];
+
+    // 从订单记录中获取卖家 UID
+    const seller_uid = order.seller_id;
+    if (!seller_uid) {
+      return errorResponse('Order has no seller_id, cannot transfer', 400, 'missing_seller_id', env);
+    }
+
+    // 2. 验证订单状态：必须是 shipped（已发货）才能确认收货并转账
+    if (order.status !== 'shipped') {
+      return errorResponse(
+        `Order status is '${order.status}', must be 'shipped' to confirm receipt`,
+        400, 'invalid_status', env
+      );
+    }
+
+    // 3. 防重复：检查是否已经转账过
+    if (order.a2u_txid) {
+      return jsonResponse({
+        success: true,
+        message: 'Transfer already completed',
+        a2u_payment_id: order.a2u_payment_id,
+        a2u_txid: order.a2u_txid,
+      }, 200, env);
+    }
+
+    // 4. 获取钱包私钥
+    const walletPrivateSeed = env.WALLET_PRIVATE_SEED;
+    if (!walletPrivateSeed) {
+      return errorResponse('Wallet private seed not configured', 500, 'missing_wallet_seed', env);
+    }
+
+    // 5. 初始化密钥对
+    const keypair = Keypair.fromSecret(walletPrivateSeed);
+    console.log('[A2U] Keypair initialized, public key:', keypair.publicKey());
+
+    // 6. 调用 Pi Platform API 创建 A2U 支付
+    const paymentArgs = {
+      amount: parseFloat(order.amount),
+      memo: `Piflea: ${order.memo || '买家已确认收货'}`,
+      metadata: {
+        orderId: order.id,
+        paymentId: order.payment_id,
+        type: 'seller_payout',
+      },
+      uid: seller_uid,
+    };
+    console.log('[A2U] Creating payment for seller:', seller_uid, 'amount:', paymentArgs.amount);
+
+    const a2uPayment = await piPlatformRequest(
+      '/v2/payments',
+      'POST',
+      { payment: paymentArgs },
+      env
+    );
+    const a2uPaymentId = a2uPayment.identifier || a2uPayment.data?.identifier;
+    console.log('[A2U] Payment created:', a2uPaymentId);
+
+    // 7. 获取 A2U 支付详情（包含 from_address 和 to_address）
+    const a2uPaymentDetail = await piPlatformRequest(
+      `/v2/payments/${a2uPaymentId}`,
+      'GET', null, env
+    );
+    const paymentData = a2uPaymentDetail.data || a2uPaymentDetail;
+    const fromAddress = paymentData.from_address;
+    const toAddress = paymentData.to_address;
+    const network = paymentData.network;
+
+    // 安全校验：确认 from_address 与我们的公钥一致
+    if (fromAddress !== keypair.publicKey()) {
+      return errorResponse(
+        'Wallet private seed does not match app wallet',
+        500, 'private_seed_mismatch', env
+      );
+    }
+    console.log('[A2U] From:', fromAddress, '→ To:', toAddress, 'Network:', network);
+
+    // 8. 构建 Stellar 交易
+    const horizonConfig = getPiHorizonConfig(network);
+    const piHorizon = new Horizon.Server(horizonConfig.url);
+
+    const sourceAccount = await piHorizon.loadAccount(keypair.publicKey());
+    const baseFee = await piHorizon.fetchBaseFee();
+
+    const transaction = new TransactionBuilder(sourceAccount, {
+      fee: baseFee.toString(),
+      networkPassphrase: horizonConfig.passphrase,
+      timebounds: await piHorizon.fetchTimebounds(PI_HORIZON_DEFAULT_TIMEBOUNDS),
+    })
+      .addOperation(Operation.payment({
+        destination: toAddress,
+        asset: Asset.native(), // Pi 是原生币
+        amount: paymentData.amount.toString(),
+      }))
+      .addMemo(Memo.text(a2uPaymentId))
+      .build();
+
+    // 9. 签名交易
+    transaction.sign(keypair);
+    console.log('[A2U] Transaction signed, submitting to Pi blockchain...');
+
+    // 10. 提交到 Pi 链
+    const horizonResponse = await piHorizon.submitTransaction(transaction);
+    // @ts-ignore — Stellar SDK 返回类型中 id 可能未正确标注
+    const a2uTxid = horizonResponse.id || horizonResponse.hash;
+    console.log('[A2U] Transaction submitted, txid:', a2uTxid);
+
+    // 11. 调用 Pi Platform API 完成 A2U 支付
+    await piPlatformRequest(
+      `/v2/payments/${a2uPaymentId}/complete`,
+      'POST',
+      { txid: a2uTxid },
+      env
+    );
+    console.log('[A2U] Payment completed on Pi Platform');
+
+    // 12. 更新订单状态
+    await supabaseRequest(
+      `/orders?id=eq.${order_id}`,
+      'PATCH',
+      {
+        status: 'completed',
+        a2u_payment_id: a2uPaymentId,
+        a2u_txid: a2uTxid,
+        updated_at: new Date().toISOString(),
+      },
+      env
+    );
+
+    return jsonResponse({
+      success: true,
+      message: 'Transfer to seller completed',
+      a2u_payment_id: a2uPaymentId,
+      a2u_txid: a2uTxid,
+      amount: paymentData.amount,
+      to_address: toAddress,
+    }, 200, env);
+  } catch (err) {
+    console.error('[A2U] transfer-to-seller error:', err);
+    return errorResponse(err.message, 500, 'transfer_failed', env);
+  }
+}
+
 // ============ 路由分发 ============
 
 export default {
@@ -531,6 +710,8 @@ export default {
           return await handleMarkShipped(request, env);
         case '/api/my-orders':
           return await handleMyOrders(request, env);
+        case '/api/transfer-to-seller':
+          return await handleTransferToSeller(request, env);
         default:
           return errorResponse('Not found', 404, 'not_found', env);
       }

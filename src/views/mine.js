@@ -528,16 +528,21 @@ export function gotoOrderDetail(orderId) {
 export async function completeOrder(orderId) {
   const user = getPiUser();
   if (!user) { toast('请先登录'); return; }
-  if (!confirm('确认已收到商品？')) return;
+  if (!confirm('确认已收到商品？\n确认后平台将自动把 Pi 转给卖家。')) return;
   try {
-    const res = await fetch(BACKEND + '/api/complete-order', {
+    toast('正在确认收货并转账给卖家...');
+    const res = await fetch(BACKEND + '/api/transfer-to-seller', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: orderId, buyer_id: user.uid })
     });
     const json = await res.json();
-    if (json.success) { toast('确认收货成功！'); loadOrders('buyer'); }
-    else { toast('操作失败：' + (json.error || '未知错误')); }
+    if (json.success) {
+      toast('确认收货成功！Pi 已自动转给卖家');
+      loadOrders('buyer');
+    } else {
+      toast('操作失败：' + (json.message || json.error || '未知错误'));
+    }
   } catch (e) { toast('请求失败：' + e.message); }
 }
 
