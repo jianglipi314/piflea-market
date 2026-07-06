@@ -1,4 +1,4 @@
-﻿import { state } from '../main';
+﻿﻿import { state } from '../main';
 import { escapeHtml, fmtPrice, toast } from '../utils';
 import { createPiPayment, isPiAuthenticated, getPiUser } from '../pi-sdk';
 import { goto } from '../router';

@@ -1,4 +1,4 @@
-﻿﻿/* ============ Mine View (Personal Center) ============ */
+﻿﻿﻿﻿/* ============ Mine View (Personal Center) ============ */
 
 import { state } from '../main';
 import { HIST_KEY, DARK_KEY } from '../state';

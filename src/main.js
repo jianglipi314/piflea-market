@@ -1,4 +1,4 @@
-﻿/* ============ PiFlea Market — Main Entry ============ */
+﻿﻿/* ============ PiFlea Market — Main Entry ============ */
 // Imports
 import './styles/variables.css';
 import './styles/base.css';

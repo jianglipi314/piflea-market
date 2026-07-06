@@ -344,6 +344,11 @@
   margin-top: 14px;
 }
 
+/* 发布页底部留空，避免被导航栏遮挡 */
+#view-publish .form {
+  padding-bottom: 100px;
+}
+
 .preview-wrap {
   background: var(--card);
   border-radius: var(--radius);
@@ -538,7 +543,7 @@
   margin: 0 auto;
   background: var(--card);
   border-top: 1px solid var(--line);
-  padding: 10px 14px 78px;
+  padding: 10px 14px 90px;
   display: flex;
   gap: 10px;
   align-items: center;

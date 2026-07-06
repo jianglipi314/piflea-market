@@ -164,8 +164,16 @@ async function uploadImageToSupabase(base64Data, filename) {
  * Submit the publish form.
  */
 export async function doPublish(ev) {
-  ev.preventDefault();
-  if (state.uploading) return;
+  console.log('[doPublish] called');
+  if (ev) ev.preventDefault();
+  
+  const btn = document.getElementById('f-submit');
+  console.log('[doPublish] btn disabled:', btn?.disabled, 'uploading:', state.uploading);
+  
+  if (state.uploading) {
+    console.log('[doPublish] uploading is true, returning');
+    return;
+  }
 
   const title = document.getElementById('f-title').value.trim();
   const cat = document.getElementById('f-cat').value;
@@ -190,7 +198,6 @@ export async function doPublish(ev) {
 
   localStorage.setItem('pi_flea_me', seller);
 
-  const btn = document.getElementById('f-submit');
   btn.disabled = true;
   btn.textContent = '上传图片中...';
   state.uploading = true;
