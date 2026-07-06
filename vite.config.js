@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   root: '.',
-  base: '/piflea-market/',
+  base: mode === 'production' ? '/piflea-market/' : '/',
   publicDir: 'public',
   build: {
     outDir: 'dist',
@@ -12,4 +12,4 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
   },
-});
+}));
