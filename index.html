@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<script type="module" crossorigin src="/assets/index-BO2wXNGI.js"></script>
+<script type="module" crossorigin src="/assets/index-BKBS0uNu.js"></script>
 <link rel="stylesheet" crossorigin href="/assets/index-D-wyhDOM.css">
 
 <head>
@@ -291,9 +291,15 @@
     <div class="stat-grid">
       <div class="stat"><div class="n" id="a-items">0</div><div class="l">商品数</div></div>
       <div class="stat"><div class="n" id="a-view">0</div><div class="l">总浏览</div></div>
-      <div class="stat"><div class="n" id="a-chat">0</div><div class="l">对话数</div></div>
+      <div class="stat"><div class="n" id="a-pending">0</div><div class="l">待转账</div></div>
     </div>
-    <div class="section-title"><h3>全部商品</h3><span class="sub">可切换推荐</span></div>
+    <!-- 待转账订单 -->
+    <div class="section-title"><h3>待转账订单</h3><span class="sub" onclick="window.adminLoadTransfers()">刷新</span></div>
+    <div id="transferLoader" class="loading" style="display:none">加载中...</div>
+    <div class="list" id="transferList"></div>
+    <div id="transferEmpty" class="empty" style="display:none;padding:12px 0">暂无待转账订单</div>
+    <!-- 商品管理 -->
+    <div class="section-title" style="margin-top:16px"><h3>全部商品</h3><span class="sub">可切换推荐</span></div>
     <div id="adminLoader" class="loading" style="display:none">加载中...</div>
     <div class="list" id="adminList"></div>
     <div class="empty" style="padding:18px 0 60px">— end —</div>
