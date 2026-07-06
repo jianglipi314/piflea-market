@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<script type="module" crossorigin src="/assets/index-BKBS0uNu.js"></script>
+<script type="module" crossorigin src="/assets/index-CmwlBmmy.js"></script>
 <link rel="stylesheet" crossorigin href="/assets/index-D-wyhDOM.css">
 
 <head>
@@ -67,7 +67,7 @@
     <div class="fee-box">
       <div class="l">平台服务费</div><div class="r">免费</div>
     </div>
-    <form class="form" id="publishForm" onsubmit="doPublish(event)" novalidate>
+    <form class="form" id="publishForm" novalidate>
       <div class="row"><label>商品标题 *</label>
         <input id="f-title" placeholder="例如：九成新 iPhone 13 128G 黑色" required maxlength="40"/>
         <div class="hint">40 字以内，突出成色 / 型号 / 颜色</div>
@@ -84,9 +84,9 @@
       <div class="row"><label>商品描述</label><textarea id="f-desc" placeholder="买了多久、是否带包装、是否有瑕疵、可面交地点..." required></textarea></div>
       <div class="row"><label>图片（最多 6 张，上传到云端）</label>
         <div class="img-uploader" id="uploader">
-          <button type="button" class="thumb" onclick="document.getElementById('f-files').click()">＋</button>
+          <button type="button" class="thumb">＋</button>
         </div>
-        <input id="f-files" type="file" accept="image/*" multiple style="display:none" onchange="onFiles(event)"/>
+        <input id="f-files" type="file" accept="image/*" multiple style="display:none"/>
         <div class="hint" id="uploadHint">点击 + 选择图片，图片将上传到云端存储</div>
       </div>
       <div class="row" style="margin-top:6px"><label>联系方式</label><input id="f-contact" placeholder="站内信 / 邮箱（可选）" maxlength="30"/></div>
@@ -94,8 +94,8 @@
         <h4>📋 发布预览</h4><div id="previewBody"></div>
       </div>
       <div class="actions">
-        <button type="button" class="btn ghost" onclick="clearForm()">清空</button>
-        <button type="button" class="btn ghost" id="btnPreview" onclick="togglePreview()">预览</button>
+        <button type="button" class="btn ghost">清空</button>
+        <button type="button" class="btn ghost" id="btnPreview">预览</button>
         <button type="submit" class="btn primary" id="f-submit">免费发布</button>
       </div>
     </form>
