@@ -48,11 +48,11 @@ function initMineButtons() {
     backBtn._bound = true;
     backBtn.addEventListener('click', showMineOverview);
   }
-  // Pi 账号按钮（根据登录状态决定 piLogin / piLogout）
-  const piBtn = document.getElementById('piAuthBtn');
-  if (piBtn && !piBtn._bound) {
-    piBtn._bound = true;
-    piBtn.addEventListener('click', function() {
+  // Pi 账号行（根据登录状态决定 piLogin / piLogout）
+  const piText = document.getElementById('piAuthText');
+  if (piText && !piText._bound) {
+    piText._bound = true;
+    piText.addEventListener('click', function() {
       const user = getPiUser();
       if (user) {
         piLogout();
@@ -349,7 +349,7 @@ export function piLogout() {
   const me = localStorage.getItem('pi_flea_me') || '本地用户';
   document.getElementById('m-name').textContent = me;
   document.getElementById('m-avatar').textContent = me.slice(0, 1);
-  document.getElementById('m-id').textContent = 'uid_local · 未认证';
+  document.getElementById('m-id').textContent = '未登录';
   updatePiButtonState();
 }
 
@@ -365,7 +365,7 @@ export function applyPiUser() {
   const id = document.getElementById('m-id');
   if (nm) nm.textContent = '@' + username;
   if (av) av.textContent = (user.username || 'π').slice(0, 1).toUpperCase();
-  if (id) id.textContent = 'uid: ' + user.uid.slice(0, 10) + '... · Pi认证';
+  if (id) id.textContent = 'UID: ' + (user.uid || '').slice(0, 16);
   // Reload items to reflect Pi UID ownership
   import('../views/home').then(mod => mod.loadItems());
   updatePiButtonState();
@@ -375,23 +375,21 @@ export function applyPiUser() {
  * Update Pi auth button state.
  */
 export function updatePiButtonState() {
-  const btn = document.getElementById('piAuthBtn');
-  if (!btn) return;
+  const el = document.getElementById('piAuthText');
+  if (!el) return;
 
   const user = getPiUser();
-  const username = user ? (user.username || ('pi_' + (user.uid || '').slice(0, 8))) : null;
-  // 同时检查 window.Pi 和 PiIsAvailable（SDK 可能已初始化但 window.Pi 注入延迟）
   const hasPi = typeof window.Pi !== 'undefined';
 
-  if (user && username) {
-    btn.textContent = '已登录: @' + username;
-    btn.style.opacity = '1';
+  if (user && user.username) {
+    el.textContent = '@' + user.username;
+    el.style.color = 'var(--ok)';
   } else if (hasPi) {
-    btn.textContent = 'Pi 登录';
-    btn.style.opacity = '1';
+    el.textContent = '点击登录';
+    el.style.color = 'var(--brand)';
   } else {
-    btn.textContent = '请在Pi浏览器登录';
-    btn.style.opacity = '.5';
+    el.textContent = '请在Pi浏览器中打开';
+    el.style.color = 'var(--ink-2)';
   }
 }
 
