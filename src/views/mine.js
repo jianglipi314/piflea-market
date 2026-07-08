@@ -159,8 +159,6 @@ export function showMineOverview() {
  */
 export function switchMine(tab) {
   state.mineTab = tab;
-  document.querySelectorAll('.tabs .tab').forEach((t) => t.classList.remove('on'));
-  document.getElementById('tab-' + tab)?.classList.add('on');
 
   const mineLoader = document.getElementById('mineLoader');
   const mineList = document.getElementById('mine-list');
