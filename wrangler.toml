@@ -1,6 +1,7 @@
 name = "piflea-backend"
 main = "backend-worker.js"
 compatibility_date = "2026-06-28"
+compatibility_flags = ["nodejs_compat"]
 
 # ============================================
 # 环境变量（Wrangler 部署时会自动带上）
