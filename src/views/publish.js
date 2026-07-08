@@ -12,6 +12,34 @@ const IMAGE_QUALITY = 0.85;
 
 let uploadImages = [];
 
+let formListenerBound = false;
+export function initFormListener() {
+  if (formListenerBound) return;
+  const submitBtn = document.getElementById('f-submit');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      doPublish({ preventDefault: function(){} });
+    });
+  }
+  const form = document.getElementById('publishForm');
+  if (form) {
+    form.addEventListener('submit', function(ev) { ev.preventDefault(); doPublish(ev); });
+  }
+  const uploadBtn = document.querySelector('#uploader .thumb');
+  const fileInput = document.getElementById('f-files');
+  if (uploadBtn && fileInput) {
+    uploadBtn.addEventListener('click', function() { fileInput.click(); });
+    fileInput.addEventListener('change', function(ev) { onFiles(ev); });
+  }
+  const clearBtn = document.querySelector('.actions .btn.ghost');
+  if (clearBtn) { clearBtn.addEventListener('click', function(ev) { ev.preventDefault(); clearForm(); }); }
+  const previewBtn = document.getElementById('btnPreview');
+  if (previewBtn) { previewBtn.addEventListener('click', function(ev) { ev.preventDefault(); togglePreview(); }); }
+  formListenerBound = true;
+}
+
 /**
  * Clear the publish form.
  */

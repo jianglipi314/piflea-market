@@ -37,7 +37,7 @@ import {
   completeOrder,
   markShipped,
 } from './views/mine';
-import { renderAdmin, adminToggleReco, adminDelete } from './views/admin';
+import { renderAdmin, adminToggleReco, adminDelete, adminLoadTransfers, adminCopyTransfer, adminConfirmTransfer } from './views/admin';
 import { openSheet, closeSheet } from './components/sheet';
 
 // ============ Create global state ============ //
@@ -151,6 +151,9 @@ void loadOrders; void completeOrder; void markShipped; void gotoOrderDetail;
 // Admin
 window.adminToggleReco = adminToggleReco;
 window.adminDelete = adminDelete;
+window.adminLoadTransfers = adminLoadTransfers;
+window.adminCopyTransfer = adminCopyTransfer;
+window.adminConfirmTransfer = adminConfirmTransfer;
 
 // Sheet
 window.openSheet = openSheet;

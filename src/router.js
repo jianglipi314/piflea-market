@@ -6,7 +6,7 @@ import { renderMine } from './views/mine';
 import { renderTagCloud, onSearch } from './views/search';
 import { loadChatList, markChatsViewed } from './views/chats';
 import { renderAdmin } from './views/admin';
-import { clearForm } from './views/publish';
+import { clearForm, initFormListener } from './views/publish';
 
 const viewTitles = {
   home:   ['π 跳蚤市场', '先锋二手 · 云端数据'],
@@ -53,6 +53,7 @@ export function goto(name) {
   if (name === 'chats') { loadChatList(); markChatsViewed(); }
   if (name === 'admin') renderAdmin();
   if (name === 'publish') {
+    initFormListener();
     // Clear stale editId when navigating via nav bar (not via openEdit)
     if (state.editId) {
       clearForm();

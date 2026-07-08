@@ -1,12 +1,10 @@
 <!doctype html>
 <html lang="zh-CN">
-<script type="module" crossorigin src="/piflea-market/assets/index-BN6V8XN2.js"></script>
-<link rel="stylesheet" crossorigin href="/piflea-market/assets/index-D-wyhDOM.css">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>π 跳蚤市场 · 先锋二手</title>
+  <script type="module" src="/src/main.js"></script>
   <!-- 同步加载，确保 main.js 执行时 window.Pi 已就绪 -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
   
@@ -67,7 +65,7 @@
     <div class="fee-box">
       <div class="l">平台服务费</div><div class="r">免费</div>
     </div>
-    <form class="form" id="publishForm" onsubmit="doPublish(event)" novalidate>
+    <form class="form" id="publishForm" novalidate>
       <div class="row"><label>商品标题 *</label>
         <input id="f-title" placeholder="例如：九成新 iPhone 13 128G 黑色" required maxlength="40"/>
         <div class="hint">40 字以内，突出成色 / 型号 / 颜色</div>
@@ -84,9 +82,9 @@
       <div class="row"><label>商品描述</label><textarea id="f-desc" placeholder="买了多久、是否带包装、是否有瑕疵、可面交地点..." required></textarea></div>
       <div class="row"><label>图片（最多 6 张，上传到云端）</label>
         <div class="img-uploader" id="uploader">
-          <button type="button" class="thumb" onclick="document.getElementById('f-files').click()">＋</button>
+          <button type="button" class="thumb">＋</button>
         </div>
-        <input id="f-files" type="file" accept="image/*" multiple style="display:none" onchange="onFiles(event)"/>
+        <input id="f-files" type="file" accept="image/*" multiple style="display:none"/>
         <div class="hint" id="uploadHint">点击 + 选择图片，图片将上传到云端存储</div>
       </div>
       <div class="row"><label>卖家昵称 *</label><input id="f-seller" placeholder="你的昵称" maxlength="16" required/></div>
@@ -95,9 +93,9 @@
         <h4>📋 发布预览</h4><div id="previewBody"></div>
       </div>
       <div class="actions">
-        <button type="button" class="btn ghost" onclick="clearForm()">清空</button>
-        <button type="button" class="btn ghost" id="btnPreview" onclick="togglePreview()">预览</button>
-        <button type="submit" class="btn primary" id="f-submit">免费发布</button>
+        <button type="button" class="btn ghost">清空</button>
+        <button type="button" class="btn ghost" id="btnPreview">预览</button>
+        <button type="button" class="btn primary" id="f-submit">免费发布</button>
       </div>
     </form>
   </section>
@@ -292,8 +290,12 @@
     <div class="stat-grid">
       <div class="stat"><div class="n" id="a-items">0</div><div class="l">商品数</div></div>
       <div class="stat"><div class="n" id="a-view">0</div><div class="l">总浏览</div></div>
-      <div class="stat"><div class="n" id="a-chat">0</div><div class="l">对话数</div></div>
+      <div class="stat"><div class="n" id="a-pending">0</div><div class="l">待转账</div></div>
     </div>
+    <div class="section-title"><h3>待转账订单</h3><span class="sub" onclick="window.adminLoadTransfers()">刷新</span></div>
+    <div id="transferLoader" class="loading" style="display:none">加载中...</div>
+    <div class="list" id="transferList"></div>
+    <div id="transferEmpty" class="empty" style="display:none;padding:12px 0">暂无待转账订单</div>
     <div class="section-title"><h3>全部商品</h3><span class="sub">可切换推荐</span></div>
     <div id="adminLoader" class="loading" style="display:none">加载中...</div>
     <div class="list" id="adminList"></div>
