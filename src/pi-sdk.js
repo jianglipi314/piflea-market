@@ -135,7 +135,7 @@ export async function authenticateWithPi() {
   await ensureInit();
   try {
     const authResult = await window.Pi.authenticate(
-      ['username', 'payments'],
+      ['username', 'payments', 'wallet_address'],
       function onIncompletePaymentFound(payment) {
         console.log('Incomplete payment found:', payment);
       }
@@ -169,7 +169,7 @@ function silentReAuth() {
   if (!window.Pi || typeof window.Pi.authenticate !== 'function') return;
 
   window.Pi.authenticate(
-    ['username', 'payments'],
+    ['username', 'payments', 'wallet_address'],
     function onIncompletePaymentFound(payment) {
       console.log('[silentReAuth] Incomplete payment found:', payment);
     }
