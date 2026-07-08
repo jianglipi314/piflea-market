@@ -10,7 +10,7 @@
  * - WALLET_PRIVATE_SEED: 开发者钱包私钥（S 开头，用于 A2U 自动转账）
  */
 
-import { Keypair, Operation, Asset, TransactionBuilder, Memo, StrKey, Networks } from '@stellar/stellar-base';
+import { Keypair, Operation, Asset, TransactionBuilder, Memo, StrKey, Networks, Account } from '@stellar/stellar-base';
 
 // ============ 常量 ============
 const PLATFORM_API_URL = 'https://api.minepi.com';
@@ -63,6 +63,22 @@ async function piPlatformRequest(path, method = 'GET', body = null, env) {
     throw new Error(`Pi API ${path} failed: ${res.status} ${text}`);
   }
   return res.json();
+}
+
+// 调用 Pi Platform API，返回原始错误信息（不抛异常）
+async function piPlatformRequestRaw(path, method = 'GET', body = null, env) {
+  const url = `${PLATFORM_API_URL}${path}`;
+  const piApiKey = env.PI_API_KEY;
+  const headers = {
+    'Authorization': `Key ${piApiKey}`,
+    'Content-Type': 'application/json',
+  };
+  const options = { method, headers };
+  if (body) options.body = JSON.stringify(body);
+
+  const res = await fetch(url, options);
+  const text = await res.text();
+  return { ok: res.ok, status: res.status, body: text };
 }
 
 // ============ Supabase 操作 ============
@@ -593,21 +609,82 @@ async function handleTransferToSeller(request, env) {
     };
     console.log('[A2U] Creating payment for seller:', seller_uid, 'amount:', paymentArgs.amount);
 
-    const a2uPayment = await piPlatformRequest(
-      '/v2/payments',
-      'POST',
-      { payment: paymentArgs },
-      env
-    );
-    const a2uPaymentId = a2uPayment.identifier || a2uPayment.data?.identifier;
-    console.log('[A2U] Payment created:', a2uPaymentId);
+    let a2uPaymentId;
+    let paymentData;
 
-    // 7. 获取 A2U 支付详情（包含 from_address 和 to_address）
-    const a2uPaymentDetail = await piPlatformRequest(
-      `/v2/payments/${a2uPaymentId}`,
-      'GET', null, env
-    );
-    const paymentData = a2uPaymentDetail.data || a2uPaymentDetail;
+    try {
+      const a2uPayment = await piPlatformRequest(
+        '/v2/payments',
+        'POST',
+        { payment: paymentArgs },
+        env
+      );
+      a2uPaymentId = a2uPayment.identifier || a2uPayment.data?.identifier;
+      console.log('[A2U] Payment created:', a2uPaymentId);
+
+      // 获取 A2U 支付详情
+      const a2uPaymentDetail = await piPlatformRequest(
+        `/v2/payments/${a2uPaymentId}`,
+        'GET', null, env
+      );
+      paymentData = a2uPaymentDetail.data || a2uPaymentDetail;
+    } catch (createErr) {
+      // 检测 ongoing_payment_found 错误
+      const errMsg = createErr.message || '';
+      if (errMsg.includes('ongoing_payment_found')) {
+        console.log('[A2U] Ongoing payment found, trying to cancel and retry...');
+
+        // 从错误信息中提取遗留支付的信息
+        // 错误格式: Pi API /v2/payments failed: 400{"error":"ongoing_payment_found",...,"payment":{...,"identifier":"xxx",...}}
+        let ongoingPaymentId = null;
+        try {
+          const jsonStart = errMsg.indexOf('{');
+          if (jsonStart >= 0) {
+            const jsonStr = errMsg.substring(jsonStart);
+            const errObj = JSON.parse(jsonStr);
+            ongoingPaymentId = errObj.payment?.identifier;
+          }
+        } catch (e) {
+          console.error('[A2U] Failed to parse ongoing payment from error:', e);
+        }
+
+        if (ongoingPaymentId) {
+          console.log('[A2U] Cancelling ongoing payment:', ongoingPaymentId);
+          try {
+            await piPlatformRequest(
+              `/v2/payments/${ongoingPaymentId}/cancel`,
+              'POST',
+              {},
+              env
+            );
+            console.log('[A2U] Ongoing payment cancelled, retrying...');
+          } catch (cancelErr) {
+            console.error('[A2U] Cancel failed:', cancelErr.message);
+          }
+
+          // 重新创建 A2U 支付
+          const a2uPayment = await piPlatformRequest(
+            '/v2/payments',
+            'POST',
+            { payment: paymentArgs },
+            env
+          );
+          a2uPaymentId = a2uPayment.identifier || a2uPayment.data?.identifier;
+          console.log('[A2U] Payment created after cancel:', a2uPaymentId);
+
+          const a2uPaymentDetail = await piPlatformRequest(
+            `/v2/payments/${a2uPaymentId}`,
+            'GET', null, env
+          );
+          paymentData = a2uPaymentDetail.data || a2uPaymentDetail;
+        } else {
+          throw createErr;
+        }
+      } else {
+        throw createErr;
+      }
+    }
+
     const fromAddress = paymentData.from_address;
     const toAddress = paymentData.to_address;
     const network = paymentData.network;
@@ -630,7 +707,7 @@ async function handleTransferToSeller(request, env) {
     const accountRes = await fetch(`${horizonUrl}/accounts/${publicKey}`);
     if (!accountRes.ok) throw new Error('Failed to load account: ' + await accountRes.text());
     const accountData = await accountRes.json();
-    const sourceAccount = { accountId: () => publicKey, sequenceNumber: () => accountData.sequence };
+    const sourceAccount = new Account(publicKey, accountData.sequence);
 
     // 8b. 获取基础手续费
     const feeRes = await fetch(`${horizonUrl}/fee_stats`);

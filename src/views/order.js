@@ -140,12 +140,10 @@ export function confirmPayment() {
     function(success, msg, paymentId, txid) {
       btn.disabled = false;
       btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
-      // \u4E8C\u6B21\u6821\u9A8C\uFF1A\u5FC5\u987B\u6709 paymentId \u548C txid \u624D\u521B\u5EFA\u8BA2\u5355
       if (success && paymentId && txid) {
         // Save order to database
         createOrder(paymentId, txid);
-        toast('\u652F\u4ED8\u6210\u529F\uFF01');
-        goto('mine');
+        showPaymentSuccess(total);
       } else if (msg) {
         toast('\u652F\u4ED8\u5931\u8D25\uFF1A' + msg);
       }
@@ -154,6 +152,55 @@ export function confirmPayment() {
     btn.disabled = false;
     btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
     console.error('createPiPayment error:', err);
+  });
+}
+
+/**
+ * 付款成功弹窗
+ */
+function showPaymentSuccess(amount) {
+  // 如果已有弹窗先移除
+  const old = document.getElementById('pay-success-modal');
+  if (old) old.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'pay-success-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);animation:fadeIn 0.3s ease;';
+  modal.innerHTML = `
+    <div style="background:var(--card,#fff);border-radius:20px;padding:32px 28px;max-width:320px;width:86%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.2);animation:scaleIn 0.3s ease;">
+      <div style="font-size:56px;margin-bottom:12px;">✅</div>
+      <div style="font-size:20px;font-weight:700;color:var(--text,#222);margin-bottom:8px;">支付成功！</div>
+      <div style="font-size:15px;color:var(--text2,#888);margin-bottom:24px;">已支付 ${fmtPrice(amount)} π<br>订单已创建，等待卖家发货</div>
+      <button id="pay-success-btn" style="background:var(--primary,#6C4CF1);color:#fff;border:none;border-radius:12px;padding:13px 0;width:100%;font-size:16px;font-weight:600;cursor:pointer;">查看我的订单</button>
+    </div>
+  `;
+
+  // 加动画样式
+  if (!document.getElementById('pay-success-anim')) {
+    const style = document.createElement('style');
+    style.id = 'pay-success-anim';
+    style.textContent = `
+      @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+      @keyframes scaleIn { from { transform: scale(0.85); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(modal);
+
+  // 点击按钮跳转到"我的"
+  const okBtn = modal.querySelector('#pay-success-btn');
+  okBtn.addEventListener('click', function() {
+    modal.remove();
+    goto('mine');
+  });
+
+  // 点击遮罩也可以关闭
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      modal.remove();
+      goto('mine');
+    }
   });
 }
 

@@ -263,9 +263,9 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
     if (onComplete) onComplete(false, '支付超时');
   }, 30000);
 
-  const resetButton = () => {
+  const resetButton = (paymentId, txid) => {
     clearTimeout(timeoutId);
-    if (onComplete) onComplete(true);
+    if (onComplete) onComplete(true, null, paymentId, txid);
   };
 
   const failButton = (msg) => {
@@ -308,7 +308,7 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
         onReadyForServerCompletion: function (paymentId, txid) {
           console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid);
           debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
-          toast('✅ 支付完成！');
+          toast('✅ 支付完成！正在创建订单...');
           fetch(BACKEND_URL + '/api/complete', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
@@ -316,7 +316,7 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
             console.error('[DEBUG] complete err:', e);
             debug('complete err: ' + e, true);
           });
-          resetButton();
+          resetButton(paymentId, txid);
         },
         onCancel: function (paymentId) {
           debug('onCancel: ' + paymentId);
