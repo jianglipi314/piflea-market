@@ -23,7 +23,6 @@ import {
   renderMine,
   switchMine,
   showMineOverview,
-  editMyName,
   toggleAdmin,
   piLogin,
   piPayTest,
@@ -176,7 +175,6 @@ window.checkChatTable = checkChatTable;
 // Mine
 window.switchMine = switchMine;
 window.showMineOverview = showMineOverview;
-window.editMyName = editMyName;
 window.toggleAdmin = toggleAdmin;
 window.piLogin = piLogin;
 window.piPayTest = piPayTest;

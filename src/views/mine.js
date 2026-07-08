@@ -35,12 +35,6 @@ function initTabListeners() {
  * Replaces inline onclick handlers for Pi Browser compatibility.
  */
 function initMineButtons() {
-  // 编辑昵称
-  const editBtn = document.getElementById('m-edit-btn');
-  if (editBtn && !editBtn._bound) {
-    editBtn._bound = true;
-    editBtn.addEventListener('click', editMyName);
-  }
   // 深色模式切换：由 main.js 统一绑定（#darkToggle），此处不再重复绑定
   // 返回按钮
   const backBtn = document.getElementById('mine-back-btn');
@@ -72,9 +66,15 @@ export function renderMine() {
   initTabListeners();
   initMineButtons();
   initMineDelegation();
-  const me = localStorage.getItem('pi_flea_me') || '本地用户';
-  document.getElementById('m-name').textContent = me;
-  document.getElementById('m-avatar').textContent = me.slice(0, 1);
+
+  // 显示 Pi 用户信息
+  const user = getPiUser();
+  if (user && user.username) {
+    const av = document.getElementById('m-avatar');
+    const nm = document.getElementById('m-name');
+    if (av) av.textContent = (user.username || 'π').slice(0, 1).toUpperCase();
+    if (nm) nm.textContent = '@' + user.username;
+  }
 
   // Counts
   const myIds = getAllMyUserIds();
@@ -279,30 +279,6 @@ export function switchMine(tab) {
 }
 
 /**
- * Edit user nickname.
- */
-const NAME_EDIT_COOLDOWN = 24 * 60 * 60 * 1000;
-const NAME_EDIT_TIME_KEY = 'pi_flea_name_edit_at';
-
-export function editMyName() {
-  const current = localStorage.getItem('pi_flea_me') || '';
-  const lastEdit = parseInt(localStorage.getItem(NAME_EDIT_TIME_KEY) || '0', 10);
-  const now = Date.now();
-  if (lastEdit && now - lastEdit < NAME_EDIT_COOLDOWN) {
-    const hours = Math.ceil((NAME_EDIT_COOLDOWN - (now - lastEdit)) / 3600000);
-    toast('昵称每24小时可修改一次，剩余 ' + hours + ' 小时');
-    return;
-  }
-  const name = prompt('请输入你的昵称（显示在商品页）', current);
-  if (name && name.trim()) {
-    localStorage.setItem('pi_flea_me', name.trim());
-    localStorage.setItem(NAME_EDIT_TIME_KEY, String(now));
-    renderMine();
-    toast('昵称已更新');
-  }
-}
-
-/**
  * Toggle admin mode (5 clicks).
  */
 export function toggleAdmin() {
@@ -335,10 +311,12 @@ export async function piLogin() {
 export function piLogout() {
   if (!confirm('确定要退出 Pi 登录吗？')) return;
   logoutPi();
-  const me = localStorage.getItem('pi_flea_me') || '本地用户';
-  document.getElementById('m-name').textContent = me;
-  document.getElementById('m-avatar').textContent = me.slice(0, 1);
-  document.getElementById('m-id').textContent = '未登录';
+  const av = document.getElementById('m-avatar');
+  const nm = document.getElementById('m-name');
+  const id = document.getElementById('m-id');
+  if (av) av.textContent = 'π';
+  if (nm) nm.textContent = '未登录';
+  if (id) id.textContent = '未登录';
   updatePiButtonState();
 }
 
