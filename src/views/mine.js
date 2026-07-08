@@ -7,6 +7,7 @@ import { getSupabase } from '../supabase';
 import { authenticateWithPi, logoutPi, isPiAuthenticated, getPiUser, createPiPayment } from '../pi-sdk';
 import { goto } from '../router';
 import { openEdit } from './publish';
+import { openDetail } from './detail';
 import { apiFetch, BACKEND_URL as BACKEND } from '../api';
 
 // 用 addEventListener 绑定 tab 按钮（Pi Browser 不支持内联 onclick）
@@ -30,10 +31,47 @@ function initTabListeners() {
 }
 
 /**
+ * Bind mine page buttons via addEventListener (idempotent via flags).
+ * Replaces inline onclick handlers for Pi Browser compatibility.
+ */
+function initMineButtons() {
+  // 编辑昵称
+  const editBtn = document.getElementById('m-edit-btn');
+  if (editBtn && !editBtn._bound) {
+    editBtn._bound = true;
+    editBtn.addEventListener('click', editMyName);
+  }
+  // 深色模式切换：由 main.js 统一绑定（#darkToggle），此处不再重复绑定
+  // 返回按钮
+  const backBtn = document.getElementById('mine-back-btn');
+  if (backBtn && !backBtn._bound) {
+    backBtn._bound = true;
+    backBtn.addEventListener('click', showMineOverview);
+  }
+  // Pi 账号按钮（根据登录状态决定 piLogin / piLogout）
+  const piBtn = document.getElementById('piAuthBtn');
+  if (piBtn && !piBtn._bound) {
+    piBtn._bound = true;
+    piBtn.addEventListener('click', function() {
+      const user = getPiUser();
+      if (user) {
+        piLogout();
+      } else if (typeof window.Pi !== 'undefined') {
+        piLogin();
+      } else {
+        toast('请下载 Pi Browser App 访问本网站');
+      }
+    });
+  }
+}
+
+/**
  * Render the Mine page.
  */
 export function renderMine() {
   initTabListeners();
+  initMineButtons();
+  initMineDelegation();
   const me = localStorage.getItem('pi_flea_me') || '本地用户';
   document.getElementById('m-name').textContent = me;
   document.getElementById('m-avatar').textContent = me.slice(0, 1);
@@ -45,18 +83,54 @@ export function renderMine() {
       (it.owner_id && myIds.includes(it.owner_id)) ||
       (it.seller || '') === me
   );
-  const totalViews = myItems.reduce((sum, it) => sum + (it.views || 0), 0);
 
-  document.getElementById('m-post').textContent = myItems.length;
-  document.getElementById('m-view').textContent = totalViews;
-
-  // Pi wallet (placeholder)
-  document.getElementById('m-pi').textContent = isPiAuthenticated()
-    ? '∞'
-    : '100.0';
+  const mPost = document.getElementById('m-post');
+  if (mPost) mPost.textContent = myItems.length;
+  const mBuy = document.getElementById('m-buy');
+  if (mBuy) mBuy.textContent = (cachedOrders.buyer || []).length;
+  const mSell = document.getElementById('m-sell');
+  if (mSell) mSell.textContent = (cachedOrders.seller || []).length;
+  const mHist = document.getElementById('m-hist');
+  if (mHist) mHist.textContent = state.history.length;
 
   // 默认显示概览页（不直接进入任何 tab）
   showMineOverview();
+}
+
+/**
+ * Event delegation for mine-list & orderList (replaces inline onclick).
+ * Idempotent via dataset.bound flag.
+ */
+export function initMineDelegation() {
+  const list = document.getElementById('mine-list');
+  if (list && !list.dataset.bound) {
+    list.dataset.bound = '1';
+    list.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      const numId = Number(btn.dataset.id);
+      if (action === 'edit') openEdit(numId);
+      else if (action === 'markSold') markSold(numId);
+      else if (action === 'unsetSold') unsetSold(numId);
+      else if (action === 'openDetail') openDetail(numId);
+    });
+  }
+  const orderList = document.getElementById('orderList');
+  if (orderList && !orderList.dataset.bound) {
+    orderList.dataset.bound = '1';
+    orderList.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      const numId = Number(btn.dataset.id);
+      if (action === 'completeOrder') completeOrder(numId);
+      else if (action === 'markShipped') markShipped(numId);
+      else if (action === 'gotoOrder') gotoOrderDetail(numId);
+    });
+  }
 }
 
 export function showMineOverview() {
@@ -158,7 +232,7 @@ export function switchMine(tab) {
       list.innerHTML = filtered
         .map(
           (it) =>
-            `<div class="row-item" onclick="window.openDetail(${it.id})">
+            `<div class="row-item" data-action="openDetail" data-id="${it.id}">
               <div class="pic">${
                 it.images && it.images[0]
                   ? `<img src="${it.images[0]}" loading="lazy" decoding="async" onerror="this.style.display='none'"/>`
@@ -170,10 +244,10 @@ export function switchMine(tab) {
                 <div class="sub">👁 ${it.views || 0} 浏览</div>
               </div>
               <div class="row-actions">
-                <button class="edit-btn" onclick="event.stopPropagation();window.openEdit(${it.id})">编辑</button>
+                <button class="edit-btn" data-action="edit" data-id="${it.id}">编辑</button>
                 ${it.status === 'sold'
-                  ? `<button class="rm" onclick="event.stopPropagation();window.unsetSold(${it.id})">恢复在售</button>`
-                  : `<button class="edit-btn" onclick="event.stopPropagation();window.markSold(${it.id})">标记已售</button>`
+                  ? `<button class="rm" data-action="unsetSold" data-id="${it.id}">恢复在售</button>`
+                  : `<button class="edit-btn" data-action="markSold" data-id="${it.id}">标记已售</button>`
                 }
               </div>
             </div>`
@@ -193,7 +267,7 @@ export function switchMine(tab) {
       list.innerHTML = viewed
         .map(
           (it) =>
-            `<div class="row-item" onclick="window.openDetail(${it.id})">
+            `<div class="row-item" data-action="openDetail" data-id="${it.id}">
               <div class="pic">${
                 it.images && it.images[0]
                   ? `<img src="${it.images[0]}" loading="lazy" decoding="async" onerror="this.style.display='none'"/>`
@@ -312,15 +386,12 @@ export function updatePiButtonState() {
   if (user && username) {
     btn.textContent = '已登录: @' + username;
     btn.style.opacity = '1';
-    btn.onclick = piLogout;
   } else if (hasPi) {
     btn.textContent = 'Pi 登录';
     btn.style.opacity = '1';
-    btn.onclick = piLogin;
   } else {
     btn.textContent = '请在Pi浏览器登录';
     btn.style.opacity = '.5';
-    btn.onclick = () => toast('请下载 Pi Browser App 访问本网站');
   }
 }
 
@@ -431,7 +502,7 @@ export async function loadOrders(role) {
 
     orderList.innerHTML = orders.map(function(o) {
       console.log('[renderOrders] orderId=', o.id, 'title=', o.item_title);
-      return '<div class="row-item" onclick="window.gotoOrderDetail(' + o.id + ')" style="cursor:pointer">' +
+      return '<div class="row-item" data-action="gotoOrder" data-id="' + o.id + '" style="cursor:pointer">' +
         '<div class="pic" style="background:var(--bg);display:grid;place-items:center;font-size:28px;color:#b8bfd1">' +
           '\ud83d\udce6' +
         '</div>' +
@@ -442,10 +513,10 @@ export async function loadOrders(role) {
         '</div>' +
         '<div class="row-actions">' +
           (role === 'buyer' && o.status === 'shipped'
-            ? '<button class="edit-btn" onclick="event.stopPropagation();window.completeOrder(' + o.id + ')">确认收货</button>'
+            ? '<button class="edit-btn" data-action="completeOrder" data-id="' + o.id + '">确认收货</button>'
             : '') +
           (role === 'seller' && o.status === 'paid'
-            ? '<button class="edit-btn" onclick="event.stopPropagation();window.markShipped(' + o.id + ')">标记发货</button>'
+            ? '<button class="edit-btn" data-action="markShipped" data-id="' + o.id + '">标记发货</button>'
             : '') +
           (o.status === 'completed' ? '<span class="mini" style="color:var(--ok);font-size:12px">\u2714 \u5df2\u5b8c\u6210</span>' : '') +
         '</div>' +
@@ -510,10 +581,10 @@ export function gotoOrderDetail(orderId) {
       : '') +
     '<div style="padding:10px 0">' +
       (isBuyer && order.status === 'shipped'
-        ? '<button class="btn primary" onclick="window.completeOrder(' + order.id + ')" style="width:100%;padding:14px">确认收货</button>'
+        ? '<button class="btn primary" data-action="completeOrder" data-id="' + order.id + '" style="width:100%;padding:14px">确认收货</button>'
         : '') +
       (!isBuyer && order.status === 'paid'
-        ? '<button class="btn primary" onclick="window.markShipped(' + order.id + ')" style="width:100%;padding:14px">标记发货</button>'
+        ? '<button class="btn primary" data-action="markShipped" data-id="' + order.id + '" style="width:100%;padding:14px">标记发货</button>'
         : '') +
       (order.status === 'completed' ? '<div style="text-align:center;color:var(--ok);font-size:14px">✔ 交易已完成</div>' : '') +
     '</div>';
@@ -523,14 +594,18 @@ export function gotoOrderDetail(orderId) {
 
   goto('order-detail');
 
-  // 兜底绑定返回按钮（使用 addEventListener 兼容 Pi Browser）
-  const backBtn = document.getElementById('od-back-btn');
-  if (backBtn) {
-    backBtn.addEventListener('click', function(e) {
-      e.preventDefault();
+  // 订单详情按钮事件委托（替换内联 onclick，兼容 Pi Browser）
+  const odContent = document.getElementById('od-content');
+  if (odContent && !odContent.dataset.bound) {
+    odContent.dataset.bound = '1';
+    odContent.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
       e.stopPropagation();
-      console.log('[order-detail] 返回按钮点击');
-      goto('mine');
+      const action = btn.dataset.action;
+      const numId = Number(btn.dataset.id);
+      if (action === 'completeOrder') completeOrder(numId);
+      else if (action === 'markShipped') markShipped(numId);
     });
   }
 }

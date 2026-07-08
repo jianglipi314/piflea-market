@@ -7,13 +7,35 @@ import { cardHTML } from '../components/card';
 import { toast, debounce } from '../utils';
 
 /**
+ * qInput / 清除按钮 的监听已统一在 main.js (DOMContentLoaded) 中绑定，
+ * 此处保留空函数以兼容 renderTagCloud 的调用，避免重复绑定。
+ */
+export function initSearchInput() {
+}
+
+/**
  * Render the tag cloud.
  */
 export function renderTagCloud() {
+  initSearchInput();
   document.getElementById('tagcloud').innerHTML = HOT_TAGS.map(
     (t) =>
-      `<button class="t" onclick="document.getElementById('qInput').value='${t}';window.doSearch()">${t}</button>`
+      `<button class="t" data-tag="${t}">${t}</button>`
   ).join('');
+
+  // 事件委托（替换内联 onclick，兼容 Pi Browser）
+  const tagcloud = document.getElementById('tagcloud');
+  if (tagcloud && !tagcloud.dataset.bound) {
+    tagcloud.dataset.bound = '1';
+    tagcloud.addEventListener('click', function(e) {
+      const tag = e.target.closest('[data-tag]');
+      if (tag) {
+        const q = document.getElementById('qInput');
+        if (q) q.value = tag.dataset.tag;
+        doSearch();
+      }
+    });
+  }
 }
 
 /**

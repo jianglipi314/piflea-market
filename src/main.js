@@ -50,6 +50,60 @@ document.addEventListener('DOMContentLoaded', () => {
   initNav();
   initSheet();
 
+  // Topbar / page buttons (replace inline onclick with addEventListener for Pi Browser compat)
+  const menuBtnEl = document.getElementById('btn-menu');
+  if (menuBtnEl) menuBtnEl.addEventListener('click', () => openSheet('menu'));
+
+  const publishCta = document.getElementById('btn-publish-cta');
+  if (publishCta) publishCta.addEventListener('click', () => goto('publish'));
+
+  const searchClear = document.getElementById('btn-search-clear');
+  if (searchClear) searchClear.addEventListener('click', () => {
+    const qi = document.getElementById('qInput');
+    if (qi) qi.value = '';
+    onSearch();
+  });
+
+  const qInput = document.getElementById('qInput');
+  if (qInput) qInput.addEventListener('input', () => onSearch());
+
+  const oBackBtn = document.getElementById('o-back-btn');
+  if (oBackBtn) oBackBtn.addEventListener('click', () => goto('detail'));
+
+  const odBackBtn = document.getElementById('od-back-btn');
+  if (odBackBtn) odBackBtn.addEventListener('click', () => goto('mine'));
+
+  const checkChatBtn = document.getElementById('btn-check-chat');
+  if (checkChatBtn) checkChatBtn.addEventListener('click', () => checkChatTable());
+
+  const cellPost = document.getElementById('cell-post');
+  if (cellPost) cellPost.addEventListener('click', () => switchMine('post'));
+  const cellBuy = document.getElementById('cell-buy');
+  if (cellBuy) cellBuy.addEventListener('click', () => switchMine('buy'));
+  const cellSell = document.getElementById('cell-sell');
+  if (cellSell) cellSell.addEventListener('click', () => switchMine('sell'));
+  const cellHist = document.getElementById('cell-hist');
+  if (cellHist) cellHist.addEventListener('click', () => switchMine('hist'));
+
+  const darkToggle = document.getElementById('darkToggle');
+  if (darkToggle) darkToggle.addEventListener('click', () => toggleDark());
+
+  const linkTerms = document.getElementById('link-terms');
+  if (linkTerms) linkTerms.addEventListener('click', () => window.open('/terms.html', '_blank'));
+  const linkPrivacy = document.getElementById('link-privacy');
+  if (linkPrivacy) linkPrivacy.addEventListener('click', () => window.open('/privacy.html', '_blank'));
+  const linkFeedback = document.getElementById('link-feedback');
+  if (linkFeedback) linkFeedback.addEventListener('click', () => openSheet('feedback'));
+
+  const adminBack = document.getElementById('admin-back');
+  if (adminBack) adminBack.addEventListener('click', () => goto('mine'));
+
+  const adminRefreshTransfers = document.getElementById('admin-refresh-transfers');
+  if (adminRefreshTransfers) adminRefreshTransfers.addEventListener('click', () => adminLoadTransfers());
+
+  const closeSheetBtn = document.getElementById('btn-close-sheet');
+  if (closeSheetBtn) closeSheetBtn.addEventListener('click', () => closeSheet());
+
   // Init Pi SDK
   initPiAndAuthenticate((restoredUser) => {
     updatePiButtonState();

@@ -9,11 +9,42 @@ import { getSupabase } from '../supabase';
 let heroImgIdx = 0;
 
 /**
+ * Bind detail view action buttons (idempotent via flags).
+ * Replaces inline onclick handlers for Pi Browser compatibility.
+ */
+export function initDetailButtons() {
+  const chatBtn = document.getElementById('d-chat-btn');
+  if (chatBtn && !chatBtn._bound) {
+    chatBtn._bound = true;
+    chatBtn.addEventListener('click', openDetailChat);
+  }
+  const shareBtn = document.getElementById('d-share-btn');
+  if (shareBtn && !shareBtn._bound) {
+    shareBtn._bound = true;
+    shareBtn.addEventListener('click', () => openSheet('share'));
+  }
+  const reportBtn = document.getElementById('d-report-btn');
+  if (reportBtn && !reportBtn._bound) {
+    reportBtn._bound = true;
+    reportBtn.addEventListener('click', () => openSheet('report'));
+  }
+  const fab = document.getElementById('d-fab');
+  const buyBtn = fab && fab.querySelector('.btn.primary');
+  if (buyBtn && !buyBtn._bound) {
+    buyBtn._bound = true;
+    buyBtn.addEventListener('click', fakeBuy);
+  }
+}
+
+/**
  * Open detail view for an item.
  */
 export async function openDetail(id) {
   const it = state.items.find((x) => x.id === id);
   if (!it) { toast('商品不存在'); return; }
+
+  // Bind action buttons (idempotent)
+  initDetailButtons();
 
   state.currentDetailId = id;
 

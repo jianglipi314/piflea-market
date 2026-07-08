@@ -57,12 +57,26 @@ export async function renderAdmin() {
           <div class="mini">推荐: ${d.tpl || '—'}</div>
         </div>
         <div class="row-actions">
-          <button class="edit-btn" onclick="window.adminToggleReco(${d.id})">切换推荐</button>
-          <button class="rm" onclick="window.adminDelete(${d.id})">删除</button>
+          <button class="edit-btn" data-action="toggleReco" data-id="${d.id}">切换推荐</button>
+          <button class="rm" data-action="delete" data-id="${d.id}">删除</button>
         </div>
       </div>`
       )
       .join('');
+
+    // 事件委托（替换内联 onclick，兼容 Pi Browser）
+    if (list && !list.dataset.bound) {
+      list.dataset.bound = '1';
+      list.addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        e.stopPropagation();
+        const action = btn.dataset.action;
+        const id = Number(btn.dataset.id);
+        if (action === 'toggleReco') adminToggleReco(id);
+        else if (action === 'delete') adminDelete(id);
+      });
+    }
 
     // Load pending transfers
     adminLoadTransfers();
@@ -111,11 +125,27 @@ export async function adminLoadTransfers() {
             '<div class="sub">卖家: ' + (o.seller_id || '—') + '</div>' +
           '</div>' +
           '<div class="row-actions" style="display:flex;flex-direction:column;gap:6px">' +
-            '<button class="edit-btn" onclick="window.adminCopyTransfer(\'' + (o.seller_id || '') + '\',\'' + (o.item_price || o.amount || 0) + '\')">一键复制</button>' +
-            '<button class="edit-btn" onclick="window.adminConfirmTransfer(' + o.id + ')" style="color:var(--ok)">确认已转账</button>' +
+            '<button class="edit-btn" data-action="copyTransfer" data-seller="' + (o.seller_id || '') + '" data-amount="' + (o.item_price || o.amount || 0) + '">一键复制</button>' +
+            '<button class="edit-btn" data-action="confirmTransfer" data-id="' + o.id + '" style="color:var(--ok)">确认已转账</button>' +
           '</div>' +
         '</div>';
       }).join('');
+
+      // 事件委托（替换内联 onclick，兼容 Pi Browser）
+      if (!transferList.dataset.bound) {
+        transferList.dataset.bound = '1';
+        transferList.addEventListener('click', function(e) {
+          const btn = e.target.closest('[data-action]');
+          if (!btn) return;
+          e.stopPropagation();
+          const action = btn.dataset.action;
+          if (action === 'copyTransfer') {
+            adminCopyTransfer(btn.dataset.seller || '', btn.dataset.amount || '');
+          } else if (action === 'confirmTransfer') {
+            adminConfirmTransfer(Number(btn.dataset.id));
+          }
+        });
+      }
     }
   } catch (e) {
     if (transferLoader) transferLoader.style.display = 'none';

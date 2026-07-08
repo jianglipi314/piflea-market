@@ -85,13 +85,13 @@ export function renderHome() {
   const icons = ['cat2', 'cat3', 'cat4', 'cat5', 'cat6', 'cat7', 'cat8', ''];
   document.getElementById('quick').innerHTML = CATS.map(
     (c, i) =>
-      `<div class="q" onclick="window.setCat('${c}')"><div class="q-icon ${icons[i - 1] || ''}">${CAT_ICON[c]}</div><span>${c}</span></div>`
+      `<div class="q" data-cat="${c}"><div class="q-icon ${icons[i - 1] || ''}">${CAT_ICON[c]}</div><span>${c}</span></div>`
   ).join('');
 
   // Category chips
   document.getElementById('cats').innerHTML = CATS.map(
     (c) =>
-      `<button class="chip ${c === state.cat ? 'on' : ''}" onclick="window.setCat('${c}')"><span class="dot"></span>${CAT_ICON[c] || '•'} ${c}</button>`
+      `<button class="chip ${c === state.cat ? 'on' : ''}" data-cat="${c}"><span class="dot"></span>${CAT_ICON[c] || '•'} ${c}</button>`
   ).join('');
   document.getElementById('catTip').textContent = state.cat;
 
@@ -105,7 +105,7 @@ export function renderHome() {
   document.getElementById('sortbar').innerHTML = sorts
     .map(
       (s) =>
-        `<button class="chip ${state.sort === s[0] ? 'on' : ''}" onclick="window.setSort('${s[0]}')"><span class="dot"></span>${s[1]}</button>`
+        `<button class="chip ${state.sort === s[0] ? 'on' : ''}" data-sort="${s[0]}"><span class="dot"></span>${s[1]}</button>`
     )
     .join('');
 
@@ -113,4 +113,30 @@ export function renderHome() {
   let items = state.items.slice();
   document.getElementById('empty').style.display = items.length ? 'none' : 'block';
   document.getElementById('list').innerHTML = items.map((it) => cardHTML(it)).join('');
+
+  // 事件委托（替换内联 onclick，兼容 Pi Browser）
+  const quickEl = document.getElementById('quick');
+  if (quickEl && !quickEl.dataset.bound) {
+    quickEl.dataset.bound = '1';
+    quickEl.addEventListener('click', function(e) {
+      const q = e.target.closest('[data-cat]');
+      if (q) setCat(q.dataset.cat);
+    });
+  }
+  const catsEl = document.getElementById('cats');
+  if (catsEl && !catsEl.dataset.bound) {
+    catsEl.dataset.bound = '1';
+    catsEl.addEventListener('click', function(e) {
+      const chip = e.target.closest('[data-cat]');
+      if (chip) setCat(chip.dataset.cat);
+    });
+  }
+  const sortbarEl = document.getElementById('sortbar');
+  if (sortbarEl && !sortbarEl.dataset.bound) {
+    sortbarEl.dataset.bound = '1';
+    sortbarEl.addEventListener('click', function(e) {
+      const chip = e.target.closest('[data-sort]');
+      if (chip) setSort(chip.dataset.sort);
+    });
+  }
 }

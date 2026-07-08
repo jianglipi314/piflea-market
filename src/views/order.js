@@ -38,6 +38,13 @@ export function openOrder(id) {
     backBtn.onclick = () => goto('detail');
   }
 
+  // 绑定确认支付按钮（idempotent via flag，替代内联 onclick）
+  const confirmBtn = document.getElementById('o-confirm-btn');
+  if (confirmBtn && !confirmBtn._bound) {
+    confirmBtn._bound = true;
+    confirmBtn.addEventListener('click', confirmPayment);
+  }
+
   document.getElementById('o-emoji').textContent = it.emoji || '\u{1F4E6}';
   document.getElementById('o-title').textContent = it.title || '—';
   document.getElementById('o-seller').textContent = '\u5356\u5BB6\uFF1A' + (it.seller || '\u672A\u77E5');

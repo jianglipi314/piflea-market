@@ -27,10 +27,10 @@ export function initFormListener() {
   if (form) {
     form.addEventListener('submit', function(ev) { ev.preventDefault(); doPublish(ev); });
   }
-  const uploadBtn = document.querySelector('#uploader .thumb');
+  // 上传区点击（含动态生成的 + 按钮 / 删除按钮）改由 #uploader 事件委托处理，
+  // 这里仅保留文件选择 change 监听。
   const fileInput = document.getElementById('f-files');
-  if (uploadBtn && fileInput) {
-    uploadBtn.addEventListener('click', function() { fileInput.click(); });
+  if (fileInput) {
     fileInput.addEventListener('change', function(ev) { onFiles(ev); });
   }
   const clearBtn = document.querySelector('.actions .btn.ghost');
@@ -124,12 +124,31 @@ function renderUploader() {
     uploadImages
       .map(
         (src, i) =>
-          `<div class="thumb uploaded"><img src="${src}" loading="lazy" decoding="async"/><button type="button" class="x" onclick="window.removeImg(${i})">×</button></div>`
+          `<div class="thumb uploaded"><img src="${src}" loading="lazy" decoding="async"/><button type="button" class="x" data-remove="${i}">×</button></div>`
       )
       .join('') +
     (uploadImages.length < 6
-      ? `<button type="button" class="thumb" onclick="document.getElementById('f-files').click()">＋</button>`
+      ? `<button type="button" class="thumb" data-add="1">＋</button>`
       : '');
+
+  // 事件委托（替换内联 onclick，兼容 Pi Browser）
+  const uploader = document.getElementById('uploader');
+  if (uploader && !uploader.dataset.bound) {
+    uploader.dataset.bound = '1';
+    uploader.addEventListener('click', function(e) {
+      const x = e.target.closest('[data-remove]');
+      if (x) {
+        e.stopPropagation();
+        removeImg(Number(x.dataset.remove));
+        return;
+      }
+      const add = e.target.closest('[data-add]');
+      if (add) {
+        e.stopPropagation();
+        document.getElementById('f-files').click();
+      }
+    });
+  }
 }
 
 export function removeImg(i) {

@@ -7,6 +7,35 @@ import { escapeHtml, timeAgo, toast, getAllMyUserIds, getCurrentUserId } from '.
 const CHATS_VIEWED_KEY = 'pi_flea_chats_viewed_v1';
 
 /**
+ * Bind chat view buttons via addEventListener (idempotent via flags).
+ * Replaces inline onclick/onkeydown handlers for Pi Browser compatibility.
+ */
+export function initChatButtons() {
+  const backBtn = document.getElementById('chat-back-btn');
+  if (backBtn && !backBtn._bound) {
+    backBtn._bound = true;
+    backBtn.addEventListener('click', () => window.goto('chats'));
+  }
+  const blockBtn = document.getElementById('chat-block-btn');
+  if (blockBtn && !blockBtn._bound) {
+    blockBtn._bound = true;
+    blockBtn.addEventListener('click', () => toast('已屏蔽该卖家（Demo）'));
+  }
+  const sendBtn = document.getElementById('chat-send-btn');
+  if (sendBtn && !sendBtn._bound) {
+    sendBtn._bound = true;
+    sendBtn.addEventListener('click', sendMsg);
+  }
+  const chatInput = document.getElementById('chatInput');
+  if (chatInput && !chatInput._keyBound) {
+    chatInput._keyBound = true;
+    chatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') sendMsg();
+    });
+  }
+}
+
+/**
  * Record that the user viewed the chats page.
  */
 export function markChatsViewed() {
@@ -99,13 +128,23 @@ export async function loadChatList() {
         ? item ? item.seller : '卖家'
         : item ? item.seller || '卖家' : '买家';
 
-      return '<div class="chat-item" onclick="window.openChatByKey(\'' + g.key + '\')">'
+      return '<div class="chat-item" data-key="' + g.key + '">'
         + '<div class="avatar">' + escapeHtml((sellerName || '\u03c0').slice(0, 1)) + '</div>'
         + '<div class="t"><div class="name">' + escapeHtml(sellerName || '聊天') + '</div><div class="last">' + escapeHtml(last.text || '') + '</div></div>'
         + '<div class="time">' + timeAgo(g.last) + '</div>'
         + '</div>';
     })
     .join('');
+
+  // 事件委托（替换内联 onclick，兼容 Pi Browser）
+  const chatListEl = list;
+  if (chatListEl && !chatListEl.dataset.bound) {
+    chatListEl.dataset.bound = '1';
+    chatListEl.addEventListener('click', function(e) {
+      const item = e.target.closest('[data-key]');
+      if (item) openChatByKey(item.dataset.key);
+    });
+  }
 }
 
 /**
@@ -131,6 +170,9 @@ export async function openChatByItem(item, otherUid, key) {
 
 async function openChatReal(item, otherUid) {
   if (!item) { toast('商品不存在'); return; }
+
+  // Bind chat buttons (idempotent)
+  initChatButtons();
 
   const me = getCurrentUserId();
 
