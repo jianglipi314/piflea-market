@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => ({
   root: '.',
-  base: mode === 'production' ? '/piflea-market/' : '/',
+  base: '/',
   publicDir: 'public',
   build: {
     outDir: 'dist',
