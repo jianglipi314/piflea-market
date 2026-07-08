@@ -3,6 +3,7 @@
 import { getSupabase } from '../supabase';
 import { state } from '../main';
 import { CAT_ICON, LOC_KEY } from '../state';
+import { getPiUser } from '../pi-sdk';
 import { escapeHtml, fmtPrice, toast, getCurrentUserId, getAllMyUserIds } from '../utils';
 import { goto } from '../router';
 import { loadItems } from './home';
@@ -49,9 +50,6 @@ export function clearForm() {
   renderUploader();
   document.getElementById('preview').style.display = 'none';
   setStep(1);
-
-  const me = localStorage.getItem('pi_flea_me');
-  if (me) document.getElementById('f-seller').value = me;
 
   const submitBtn = document.getElementById('f-submit');
   if (submitBtn) submitBtn.textContent = '免费发布';
@@ -176,7 +174,8 @@ function renderPreviewHTML() {
   const cat = document.getElementById('f-cat').value;
   const price = parseFloat(document.getElementById('f-price').value) || 0;
   const desc = document.getElementById('f-desc').value || '（未填）';
-  const seller = document.getElementById('f-seller').value || '你';
+  const piUser = getPiUser();
+  const seller = piUser ? (piUser.username || 'Pi用户') : 'Pi用户';
   const city = document.getElementById('f-city').value || '';
 
   return `<div class="card" style="box-shadow:none;border:1px solid var(--line);cursor:default">
@@ -226,10 +225,14 @@ export async function doPublish(ev) {
   const cat = document.getElementById('f-cat').value;
   const priceRaw = document.getElementById('f-price').value.trim();
   const desc = document.getElementById('f-desc').value.trim();
-  const seller = document.getElementById('f-seller').value.trim();
   const city = document.getElementById('f-city').value.trim();
   const contact = document.getElementById('f-contact').value.trim();
   const price = parseFloat(priceRaw);
+
+  // 自动获取 Pi 用户名作为卖家名
+  const piUser = getPiUser();
+  const seller = piUser ? (piUser.username || ('pi_' + (piUser.uid || '').slice(0, 8))) : 'Pi用户';
+  if (!piUser) { toast('请先登录 Pi 账号'); return false; }
 
   // Validation
   if (title.length < 2) { toast('商品标题至少 2 个字'); return false; }
@@ -238,12 +241,8 @@ export async function doPublish(ev) {
   if (price > 1000000) { toast('价格过高，请确认'); return false; }
   if (desc.length < 4) { toast('商品描述至少 4 个字'); return false; }
   if (desc.length > 500) { toast('商品描述最多 500 个字'); return false; }
-  if (!seller || seller.length < 2) { toast('请填写卖家昵称'); return false; }
-  if (seller.length > 16) { toast('卖家昵称最多 16 个字'); return false; }
   if (contact.length > 30) { toast('联系方式最多 30 个字'); return false; }
   if (city.length > 20) { toast('所在城市最多 20 个字'); return false; }
-
-  localStorage.setItem('pi_flea_me', seller);
 
   btn.disabled = true;
   btn.textContent = '上传图片中...';
@@ -344,11 +343,10 @@ export async function openEdit(id) {
   const it = state.items.find((x) => x.id === id);
   if (!it) { toast('商品不存在'); return; }
 
-  const me = localStorage.getItem('pi_flea_me') || '';
   const myIds = getAllMyUserIds();
   const isMine = it.owner_id
     ? myIds.includes(it.owner_id)
-    : (it.seller || '') === me;
+    : false;
   if (!isMine) { toast('无权编辑此商品'); return; }
 
   // Navigate first, then set editId (so goto can clear stale editId)
@@ -362,7 +360,6 @@ export async function openEdit(id) {
   document.getElementById('f-price').value = it.price || '';
   document.getElementById('f-city').value = it.city || '';
   document.getElementById('f-desc').value = it.desc || '';
-  document.getElementById('f-seller').value = it.seller || '';
   document.getElementById('f-contact').value = it.contact || '';
 
   // Restore images from URLs

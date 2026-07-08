@@ -208,12 +208,10 @@ export function switchMine(tab) {
   loader.style.display = 'none';
 
   if (tab === 'post') {
-    const me = localStorage.getItem('pi_flea_me') || '';
     const myIds = getAllMyUserIds();
     const filtered = state.items.filter(
       (it) =>
-        (it.owner_id && myIds.includes(it.owner_id)) ||
-        (!it.owner_id && (it.seller || '') === me)
+        (it.owner_id && myIds.includes(it.owner_id))
     );
 
     if (filtered.length) {

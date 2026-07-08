@@ -28,8 +28,7 @@ export function initDetailButtons() {
     reportBtn._bound = true;
     reportBtn.addEventListener('click', () => openSheet('report'));
   }
-  const fab = document.getElementById('d-fab');
-  const buyBtn = fab && fab.querySelector('.btn.primary');
+  const buyBtn = document.getElementById('d-buy-btn');
   if (buyBtn && !buyBtn._bound) {
     buyBtn._bound = true;
     buyBtn.addEventListener('click', fakeBuy);
@@ -184,8 +183,7 @@ export async function openDetail(id) {
   }
 
   // Update buy button for sold items
-  const fab = document.getElementById('d-fab');
-  const buyBtn = fab.querySelector('.btn.primary');
+  const buyBtn = document.getElementById('d-buy-btn');
   if (it.status === 'sold') {
     buyBtn.textContent = '🏁 已售出';
     buyBtn.disabled = true;
@@ -195,7 +193,7 @@ export async function openDetail(id) {
     buyBtn.disabled = false;
     buyBtn.style.opacity = '1';
   }
-  fab.style.display = 'flex';
+  document.getElementById('d-fab').style.display = 'flex';
   drawFakeQR(id);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
