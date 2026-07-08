@@ -3,8 +3,7 @@
 import { state } from '../main';
 import { getSupabase } from '../supabase';
 import { escapeHtml, fmtPrice, toast } from '../utils';
-
-const BACKEND = 'https://piflea-backend.1281582261.workers.dev';
+import { apiFetch } from '../api';
 
 /**
  * Render admin dashboard.
@@ -86,7 +85,7 @@ export async function adminLoadTransfers() {
   if (transferEmpty) transferEmpty.style.display = 'none';
 
   try {
-    const res = await fetch(BACKEND + '/api/admin/pending-transfers');
+    const res = await apiFetch('/api/admin/pending-transfers');
     const json = await res.json();
 
     if (transferLoader) transferLoader.style.display = 'none';
@@ -165,9 +164,8 @@ function fallbackCopy(text) {
 export async function adminConfirmTransfer(orderId) {
   if (!confirm('确认已向卖家转账？')) return;
   try {
-    const res = await fetch(BACKEND + '/api/admin/confirm-transfer', {
+    const res = await apiFetch('/api/admin/confirm-transfer', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: orderId })
     });
     const json = await res.json();

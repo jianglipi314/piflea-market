@@ -2,8 +2,8 @@
 import { escapeHtml, fmtPrice, toast } from '../utils';
 import { createPiPayment, isPiAuthenticated, getPiUser } from '../pi-sdk';
 import { goto } from '../router';
+import { apiFetch, BACKEND_URL as BACKEND } from '../api';
 
-const BACKEND = 'https://piflea-backend.1281582261.workers.dev';
 const FEE_MODE = 'A';
 const NETWORK_FEE = 0;
 const PLATFORM_FEE_RATE = 0.02;
@@ -88,9 +88,8 @@ async function createOrder(paymentId, txid) {
   const buyerId = user.uid || '';
 
   try {
-    await fetch(BACKEND + '/api/create-order', {
+    await apiFetch('/api/create-order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         payment_id: paymentId,
         txid: txid || '',

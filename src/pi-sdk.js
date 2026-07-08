@@ -1,6 +1,7 @@
 /* ============ Pi SDK Integration ============ */
 
 import { toast } from './utils';
+import { apiFetch } from './api';
 
 const PI_USER_KEY = 'pi_flea_pi_user_v1';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://piflea-backend.1281582261.workers.dev';
@@ -289,8 +290,8 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
           console.log('[DEBUG] onReadyForServerApproval triggered! paymentId:', paymentId);
           debug('onReadyForServerApproval: ' + paymentId);
           toast('支付等待确认');
-          fetch(BACKEND_URL + '/api/approve', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+          apiFetch('/api/approve', {
+            method: 'POST',
             body: JSON.stringify({
               paymentId,
               buyerId: metadata.buyerId,
@@ -309,8 +310,8 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
           console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid);
           debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
           toast('✅ 支付完成！正在创建订单...');
-          fetch(BACKEND_URL + '/api/complete', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+          apiFetch('/api/complete', {
+            method: 'POST',
             body: JSON.stringify({ paymentId, txid }),
           }).then(r => r.json()).catch(e => {
             console.error('[DEBUG] complete err:', e);

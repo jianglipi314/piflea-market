@@ -24,7 +24,7 @@ const PI_HORIZON_DEFAULT_TIMEBOUNDS = 180; // 秒
 
 // CORS 处理：根据环境变量动态设置允许的域名
 function getCorsHeaders(env) {
-  const allowedOrigin = env.FRONTEND_URL || '*';
+  const allowedOrigin = env.FRONTEND_URL || 'https://piflea.com';
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
@@ -45,6 +45,37 @@ function jsonResponse(data, status = 200, env) {
 function errorResponse(message, status = 400, code = 'error', env) {
   return jsonResponse({ success: false, error: code, message }, status, env);
 }
+
+// 验证 Pi accessToken
+async function verifyPiToken(request, env) {
+  const authHeader = request.headers.get('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${PLATFORM_API_URL}/v2/me`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user ? data.user : null;
+  } catch (e) {
+    console.error('Token verify failed:', e.message);
+    return null;
+  }
+}
+
+// 需要鉴权的路由列表
+const AUTH_REQUIRED_ROUTES = [
+  '/api/transfer-to-seller',
+  '/api/mark-shipped',
+  '/api/my-orders',
+  '/api/complete-order',
+  '/api/create-order',
+];
+
+// 管理员 UID 白名单
+const ADMIN_UIDS = ['01b4a2e0-f4b9-4a68-abcf-e0b879880707'];
 
 // 调用 Pi Platform API（使用 Server API Key）
 async function piPlatformRequest(path, method = 'GET', body = null, env) {
@@ -420,9 +451,13 @@ async function handleIncomplete(request, env) {
 // 5. GET /api/my-orders - 获取我的订单（已有，保持不变）
 async function handleMyOrders(request, env) {
   try {
+    const piUser = request.piUser;
+    if (!piUser) {
+      return errorResponse('Authentication required', 401, 'unauthorized', env);
+    }
+    const uid = piUser.uid;
     const url = new URL(request.url);
-    const uid = url.searchParams.get('uid');
-    const role = url.searchParams.get('role'); // 'buyer' | 'seller'
+    const role = url.searchParams.get('role') || 'all';
 
     if (!uid) return errorResponse('uid required', 400, 'missing_uid', env);
 
@@ -479,9 +514,10 @@ async function handleCompleteOrder(request, env) {
 // 7. POST /api/mark-shipped - 卖家标记发货
 async function handleMarkShipped(request, env) {
   try {
-    const { order_id, seller_id } = await request.json();
+    const { order_id, shipping_company, tracking_no } = await request.json();
+    const seller_id = request.piUser ? request.piUser.uid : null;
     if (!order_id || !seller_id) {
-      return errorResponse('order_id and seller_id required', 400, 'missing_params', env);
+      return errorResponse('order_id required', 400, 'missing_params', env);
     }
 
     const orders = await supabaseRequest(
@@ -492,12 +528,13 @@ async function handleMarkShipped(request, env) {
       return errorResponse('Order not found', 404, 'not_found', env);
     }
 
-    await supabaseRequest(
-      `/orders?id=eq.${order_id}`,
-      'PATCH', { status: 'shipped', updated_at: new Date().toISOString() }, env
-    );
+    // 修改 PATCH 更新，加入物流信息：
+    const updateData = { status: 'shipped', updated_at: new Date().toISOString() };
+    if (shipping_company) updateData.shipping_company = shipping_company;
+    if (tracking_no) updateData.tracking_no = tracking_no;
+    await supabaseRequest(`/orders?id=eq.${order_id}`, 'PATCH', updateData, env);
 
-    return jsonResponse({ success: true, message: 'Order marked as shipped' }, 200, env);
+    return jsonResponse({ success: true, message: 'Order marked as shipped', shipping_company, tracking_no }, 200, env);
   } catch (err) {
     console.error('mark-shipped error:', err);
     return errorResponse(err.message, 500, 'internal_error', env);
@@ -547,20 +584,35 @@ function getPiHorizonConfig(networkPassphrase) {
 // 9. POST /api/transfer-to-seller — A2U 自动转账给卖家
 async function handleTransferToSeller(request, env) {
   try {
-    const { order_id, buyer_id } = await request.json();
+    const { order_id } = await request.json();
     if (!order_id) {
       return errorResponse('order_id required', 400, 'missing_params', env);
     }
 
+    // 从验证后的 token 获取买家身份
+    const buyer_id = request.piUser ? request.piUser.uid : null;
+    if (!buyer_id) {
+      return errorResponse('Authentication required', 401, 'unauthorized', env);
+    }
+
     // 1. 查询订单（验证买家身份）
-    const query = buyer_id
-      ? `/orders?id=eq.${order_id}&buyer_id=eq.${encodeURIComponent(buyer_id)}&limit=1`
-      : `/orders?id=eq.${order_id}&limit=1`;
+    const query = `/orders?id=eq.${order_id}&limit=1`;
     const orders = await supabaseRequest(query, 'GET', null, env);
     if (!orders || !orders.length) {
       return errorResponse('Order not found', 404, 'not_found', env);
     }
     const order = orders[0];
+
+    // 在获取 order 后，验证 buyer_id 匹配
+    if (order.buyer_id !== buyer_id) {
+      return errorResponse('Only the buyer can confirm receipt', 403, 'forbidden', env);
+    }
+
+    // 金额上限校验（在获取 order 后）
+    const transferAmount = parseFloat(order.amount) || 0;
+    if (transferAmount > 1000) {
+      return errorResponse('Transfer amount exceeds limit (1000 Pi)', 400, 'amount_exceeds_limit', env);
+    }
 
     // 从订单记录中获取卖家 UID
     const seller_uid = order.seller_id;
@@ -807,7 +859,19 @@ export default {
     }
 
     try {
+      // 鉴权：需要 token 的路由
+      if (AUTH_REQUIRED_ROUTES.includes(path)) {
+        const piUser = await verifyPiToken(request, env);
+        if (!piUser) {
+          return errorResponse('Unauthorized - invalid or missing token', 401, 'unauthorized', env);
+        }
+        // 将验证后的用户信息附加到 request，供 handler 使用
+        request.piUser = piUser;
+      }
+
       switch (path) {
+        case '/api/health':
+          return jsonResponse({ success: true, message: 'Piflea backend is running!', status: 'ok' }, 200, env);
         case '/api/approve':
         case '/payments/approve':
           return await handleApprove(request, env);

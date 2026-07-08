@@ -7,6 +7,7 @@ import { getSupabase } from '../supabase';
 import { authenticateWithPi, logoutPi, isPiAuthenticated, getPiUser, createPiPayment } from '../pi-sdk';
 import { goto } from '../router';
 import { openEdit } from './publish';
+import { apiFetch, BACKEND_URL as BACKEND } from '../api';
 
 // 用 addEventListener 绑定 tab 按钮（Pi Browser 不支持内联 onclick）
 function initTabListeners() {
@@ -384,7 +385,6 @@ export async function unsetSold(id) {
  * Export app data.
  */
 
-const BACKEND = 'https://piflea-backend.1281582261.workers.dev';
 let cachedOrders = { buyer: [], seller: [] };
 let currentOrderRole = null;
 
@@ -413,7 +413,7 @@ export async function loadOrders(role) {
   }
 
   try {
-    const res = await fetch(BACKEND + '/api/my-orders?uid=' + encodeURIComponent(user.uid) + '&role=' + role);
+    const res = await apiFetch('/api/my-orders?uid=' + encodeURIComponent(user.uid) + '&role=' + role);
     const json = await res.json();
     orderLoader.style.display = 'none';
     const orders = json.data || [];
@@ -438,7 +438,7 @@ export async function loadOrders(role) {
         '<div class="txt">' +
           '<h4>' + (o.item_title || '商品') + '</h4>' +
           '<div class="price">' + (o.item_price || o.amount || 0) + ' \u03c0</div>' +
-          '<div class="sub">' + (statusMap[o.status] || o.status) + ' \u00b7 ' + new Date(o.created_at).toLocaleDateString() + '</div>' +
+          '<div class="sub">' + (statusMap[o.status] || o.status) + ' \u00b7 ' + new Date(o.created_at).toLocaleDateString() + (o.status === 'shipped' && o.shipping_company ? ' \u00b7 ' + o.shipping_company : '') + '</div>' +
         '</div>' +
         '<div class="row-actions">' +
           (role === 'buyer' && o.status === 'shipped'
@@ -498,6 +498,16 @@ export function gotoOrderDetail(orderId) {
       '<div style="font-weight:700;font-size:14px;margin-bottom:10px">👤 交易对方</div>' +
       '<div style="font-size:14px">' + otherLabel + 'UID：' + (otherUid.length > 16 ? otherUid.slice(0, 16) + '...' : otherUid) + '</div>' +
     '</div>' +
+    (order.shipping_company || order.tracking_no
+      ? '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
+        '<div style="font-weight:700;font-size:14px;margin-bottom:10px">📦 物流信息</div>' +
+        '<div style="font-size:14px;margin-bottom:4px">快递公司：' + (order.shipping_company || '—') + '</div>' +
+        '<div style="font-size:14px;margin-bottom:8px">快递单号：' + (order.tracking_no || '—') + '</div>' +
+        (order.tracking_no
+          ? '<a href="https://www.kuaidi100.com/chaxun?nu=' + encodeURIComponent(order.tracking_no) + '" target="_blank" style="font-size:13px;color:var(--brand);">查看物流轨迹 →</a>'
+          : '') +
+        '</div>'
+      : '') +
     '<div style="padding:10px 0">' +
       (isBuyer && order.status === 'shipped'
         ? '<button class="btn primary" onclick="window.completeOrder(' + order.id + ')" style="width:100%;padding:14px">确认收货</button>'
@@ -531,9 +541,8 @@ export async function completeOrder(orderId) {
   if (!confirm('确认已收到商品？\n确认后平台将自动把 Pi 转给卖家。')) return;
   try {
     toast('正在确认收货并转账给卖家...');
-    const res = await fetch(BACKEND + '/api/transfer-to-seller', {
+    const res = await apiFetch('/api/transfer-to-seller', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: orderId, buyer_id: user.uid })
     });
     const json = await res.json();
@@ -549,17 +558,60 @@ export async function completeOrder(orderId) {
 export async function markShipped(orderId) {
   const user = getPiUser();
   if (!user) { toast('请先登录'); return; }
-  if (!confirm('确认已发货？')) return;
-  try {
-    const res = await fetch(BACKEND + '/api/mark-shipped', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: orderId, seller_id: user.uid })
-    });
-    const json = await res.json();
-    if (json.success) { toast('已标记发货！'); loadOrders('seller'); }
-    else { toast('操作失败：' + (json.error || '未知错误')); }
-  } catch (e) { toast('请求失败：' + e.message); }
+
+  // 弹出发货弹窗
+  showShipModal(orderId);
+}
+
+function showShipModal(orderId) {
+  const old = document.getElementById('ship-modal');
+  if (old) old.remove();
+
+  const companies = ['顺丰速运', '中通快递', '圆通速递', '韵达快递', '申通快递', '百世快递', '邮政EMS', '京东物流', '极兔速递', '其他/自送'];
+
+  const modal = document.createElement('div');
+  modal.id = 'ship-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);';
+  modal.innerHTML = `
+    <div style="background:var(--card,#fff);border-radius:16px;padding:24px 20px;max-width:340px;width:88%;">
+      <div style="font-size:18px;font-weight:700;margin-bottom:16px;">📦 填写发货信息</div>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:13px;color:var(--ink-2);display:block;margin-bottom:6px;">快递公司</label>
+        <select id="ship-company" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--card);">
+          ${companies.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-size:13px;color:var(--ink-2);display:block;margin-bottom:6px;">快递单号</label>
+        <input id="ship-tracking" type="text" placeholder="请输入快递单号（选填）" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;" />
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button id="ship-cancel" style="flex:1;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:transparent;cursor:pointer;">取消</button>
+        <button id="ship-confirm" style="flex:1;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;background:var(--primary);color:#fff;cursor:pointer;">确认发货</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#ship-cancel').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+  modal.querySelector('#ship-confirm').addEventListener('click', async () => {
+    const company = document.getElementById('ship-company').value;
+    const trackingNo = document.getElementById('ship-tracking').value.trim();
+    modal.remove();
+
+    try {
+      toast('正在提交发货信息...');
+      const res = await apiFetch('/api/mark-shipped', {
+        method: 'POST',
+        body: JSON.stringify({ order_id: orderId, seller_id: user.uid, shipping_company: company, tracking_no: trackingNo })
+      });
+      const json = await res.json();
+      if (json.success) { toast('已标记发货！' + (trackingNo ? '物流：' + company + ' ' + trackingNo : '')); loadOrders('seller'); }
+      else { toast('操作失败：' + (json.message || json.error || '未知错误')); }
+    } catch (e) { toast('请求失败：' + e.message); }
+  });
 }
 
 export function exportData() {
