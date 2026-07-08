@@ -138,7 +138,8 @@ async function updateOrder(paymentId, updates, env) {
 // 1. POST /api/approve - 批准支付（幂等）
 async function handleApprove(request, env) {
   try {
-    const { paymentId } = await request.json();
+    const body = await request.json();
+    const { paymentId } = body;
     if (!paymentId) return errorResponse('paymentId required', 400, 'missing_payment_id', env);
 
     // 幂等性检查：同一 paymentId 已 approved 或 completed 则直接返回成功
@@ -157,16 +158,28 @@ async function handleApprove(request, env) {
     }
 
     // 调用 Pi Platform API 获取支付详情
-    const payment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
+    let piMeta = {};
+    let piAmount = 0;
+    let piMemo = '';
+    try {
+      const payment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
+      piMeta = payment?.data?.metadata || {};
+      piAmount = payment?.data?.amount?.value || 0;
+      piMemo = payment?.data?.memo || '';
+    } catch (e) {
+      console.error('Pi API GET payment failed, using frontend data:', e.message);
+    }
 
-    // 创建/更新订单
+    // 优先用前端传来的数据，后备用 Pi API metadata
     const orderData = {
       payment_id: paymentId,
-      product_id: payment.data?.metadata?.productId || payment.data?.metadata?.itemId || null,
-      buyer_id: payment.data?.metadata?.buyerId || null,
-      seller_id: payment.data?.metadata?.sellerId || null,
-      amount: payment.data?.amount?.value || 0,
-      memo: payment.data?.memo || '',
+      product_id: body.itemId || piMeta.itemId || piMeta.productId || null,
+      buyer_id: body.buyerId || piMeta.buyerId || null,
+      seller_id: body.sellerId || piMeta.sellerId || null,
+      item_title: body.itemTitle || piMeta.itemTitle || '',
+      item_price: body.itemPrice || piAmount || 0,
+      amount: body.amount || piAmount || 0,
+      memo: piMemo || body.memo || '',
       status: 'approved',
       txid: null,
       cancelled: false,
@@ -175,10 +188,13 @@ async function handleApprove(request, env) {
     };
 
     if (existing) {
-      await updateOrder(paymentId, {
-        status: 'approved',
-        updated_at: new Date().toISOString(),
-      }, env);
+      // 更新已有订单，补充缺失的字段
+      const updates = { status: 'approved', updated_at: new Date().toISOString() };
+      if (!existing.buyer_id && orderData.buyer_id) updates.buyer_id = orderData.buyer_id;
+      if (!existing.seller_id && orderData.seller_id) updates.seller_id = orderData.seller_id;
+      if (!existing.item_title && orderData.item_title) updates.item_title = orderData.item_title;
+      if ((!existing.item_price || existing.item_price == 0) && orderData.item_price) updates.item_price = orderData.item_price;
+      await updateOrder(paymentId, updates, env);
     } else {
       await createOrder(orderData, env);
     }
@@ -223,9 +239,9 @@ async function handleComplete(request, env) {
       return errorResponse('Order not found', 400, 'order_not_found', env);
     }
 
-    // 更新订单（统一用 'completed'）
+    // 更新订单状态为 paid（等待卖家发货）
     await updateOrder(paymentId, {
-      status: 'completed',
+      status: 'paid',
       txid,
       updated_at: new Date().toISOString(),
     }, env);

@@ -291,7 +291,15 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
           toast('支付等待确认');
           fetch(BACKEND_URL + '/api/approve', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId }),
+            body: JSON.stringify({
+              paymentId,
+              buyerId: metadata.buyerId,
+              sellerId: metadata.sellerId,
+              itemId: metadata.itemId,
+              itemTitle: metadata.itemTitle,
+              itemPrice: metadata.itemPrice,
+              amount: metadata.amount,
+            }),
           }).then(r => r.json()).catch(e => {
             console.error('[DEBUG] approve err:', e);
             debug('approve err: ' + e, true);

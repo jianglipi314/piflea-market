@@ -129,6 +129,9 @@ export function confirmPayment() {
     'Piflea: ' + currentOrderItem.title,
     {
       itemId: currentOrderItem.id,
+      itemTitle: currentOrderItem.title || '',
+      itemPrice: total,
+      amount: total,
       seller: currentOrderItem.seller,
       mode: FEE_MODE,
       buyerId: piUser ? piUser.uid : null,
