@@ -212,64 +212,55 @@ async function loadMessages(itemId, me, other) {
     return;
   }
 
-  messagesCache = (data || []).map((m) => ({
+  const newCache = (data || []).map((m) => ({
     from: m.from_uid === me ? 'me' : 'seller',
     text: m.text,
     t: new Date(m.created_at).getTime(),
   }));
-  renderBubbles();
+
+  // 只在消息数量或最后一条内容变化时重新渲染
+  if (newCache.length !== messagesCache.length ||
+      (newCache.length > 0 && messagesCache.length > 0 &&
+       newCache[newCache.length - 1].text !== messagesCache[messagesCache.length - 1].text)) {
+    messagesCache = newCache;
+    renderBubbles();
+  } else if (messagesCache.some(m => m.pending)) {
+    // 替换 pending 消息
+    messagesCache = newCache;
+    renderBubbles();
+  }
 }
 
 function subscribeMessages(itemId, me, other) {
+  // 清除旧轮询
   if (chatSub) {
     try { chatSub.unsubscribe(); } catch (e) {}
     chatSub = null;
   }
-
-  const supabase = getSupabase();
-  if (!supabase || !supabase.channel) return;
-
-  const myIds = getAllMyUserIds();
-
-  try {
-    chatSub = supabase
-      .channel('msg_' + itemId + '_' + Date.now())
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-        (payload) => {
-          const m = payload.new;
-          if (String(m.item_id) !== String(itemId)) return;
-          if (!myIds.includes(m.from_uid) && !myIds.includes(m.to_uid)) return;
-
-          // Check for pending message to replace (avoid duplicate)
-          const pendingIdx = messagesCache.findIndex(
-            (x) => x.pending && x.text === m.text && x.from === (m.from_uid === me ? 'me' : 'seller')
-          );
-          if (pendingIdx >= 0) {
-            // Replace pending message with confirmed one
-            messagesCache[pendingIdx] = {
-              from: m.from_uid === me ? 'me' : 'seller',
-              text: m.text,
-              t: new Date(m.created_at).getTime(),
-            };
-          } else {
-            // Check for exact duplicate (same text and timestamp)
-            if (messagesCache.find((x) => x.text === m.text && x.t === new Date(m.created_at).getTime())) return;
-            messagesCache.push({
-              from: m.from_uid === me ? 'me' : 'seller',
-              text: m.text,
-              t: new Date(m.created_at).getTime(),
-            });
-          }
-          renderBubbles();
-          loadChatList();
-        }
-      )
-      .subscribe();
-  } catch (e) {
-    console.warn('subscribe fail', e);
+  if (window._chatPollTimer) {
+    clearInterval(window._chatPollTimer);
+    window._chatPollTimer = null;
   }
+
+  // 用轮询替代 Realtime（每 3 秒检查新消息）
+  window._chatPollTimer = setInterval(async () => {
+    if (!document.getElementById('view-chat').classList.contains('active')) {
+      clearInterval(window._chatPollTimer);
+      window._chatPollTimer = null;
+      return;
+    }
+    await loadMessages(itemId, me, other);
+  }, 3000);
+
+  // 返回一个兼容的对象
+  chatSub = {
+    unsubscribe() {
+      if (window._chatPollTimer) {
+        clearInterval(window._chatPollTimer);
+        window._chatPollTimer = null;
+      }
+    },
+  };
 }
 
 function renderBubbles() {
@@ -291,6 +282,10 @@ export async function sendMsg() {
   const inp = document.getElementById('chatInput');
   const text = inp.value.trim();
   if (!text) return;
+  if (text.length > 500) {
+    toast('消息不能超过 500 字');
+    return;
+  }
   if (!currentChatKey) return;
 
   const [itemId, uid1, uid2] = currentChatKey.split('|');
