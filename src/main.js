@@ -76,15 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const checkChatBtn = document.getElementById('btn-check-chat');
   if (checkChatBtn) checkChatBtn.addEventListener('click', () => checkChatTable());
 
-  const cellPost = document.getElementById('cell-post');
-  if (cellPost) cellPost.addEventListener('click', () => switchMine('post'));
-  const cellBuy = document.getElementById('cell-buy');
-  if (cellBuy) cellBuy.addEventListener('click', () => switchMine('buy'));
-  const cellSell = document.getElementById('cell-sell');
-  if (cellSell) cellSell.addEventListener('click', () => switchMine('sell'));
-  const cellHist = document.getElementById('cell-hist');
-  if (cellHist) cellHist.addEventListener('click', () => switchMine('hist'));
-
   const darkToggle = document.getElementById('darkToggle');
   if (darkToggle) darkToggle.addEventListener('click', () => toggleDark());
 

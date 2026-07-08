@@ -84,15 +84,6 @@ export function renderMine() {
       (it.seller || '') === me
   );
 
-  const mPost = document.getElementById('m-post');
-  if (mPost) mPost.textContent = myItems.length;
-  const mBuy = document.getElementById('m-buy');
-  if (mBuy) mBuy.textContent = (cachedOrders.buyer || []).length;
-  const mSell = document.getElementById('m-sell');
-  if (mSell) mSell.textContent = (cachedOrders.seller || []).length;
-  const mHist = document.getElementById('m-hist');
-  if (mHist) mHist.textContent = state.history.length;
-
   // 默认显示概览页（不直接进入任何 tab）
   showMineOverview();
 }
