@@ -9,12 +9,12 @@ import { renderAdmin } from './views/admin';
 import { clearForm, initFormListener } from './views/publish';
 
 const viewTitles = {
-  home:   ['π 跳蚤市场', '先锋二手 · 云端数据'],
+  home:   ['π 跳蚤市场', '先锋二手 · 为派赋能'],
   search: ['搜索', '关键词 / 分类 / 排序'],
   publish: ['发布商品', '免费发布'],
-  detail: ['商品详情', '云端实时同步'],
+  detail: ['商品详情', '平台担保交易 · 收货后放款'],
   order:  ['确认订单', '担保交易 · 资金托管'],
-  'order-detail': ['订单详情', '云端实时同步'],
+  'order-detail': ['订单详情', '平台担保交易 · 收货后放款'],
   chats:  ['消息中心', '本地模拟对话'],
   chat:   ['聊天', '与卖家沟通'],
   mine:   ['我的', '个人中心'],

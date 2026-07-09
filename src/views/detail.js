@@ -70,7 +70,7 @@ export async function openDetail(id) {
 
   // 更新顶部标题为"商品详情"
   document.getElementById('topTitle').textContent = '商品详情';
-  document.getElementById('topSub').textContent = '云端实时同步';
+  document.getElementById('topSub').textContent = '平台担保交易 · 收货后放款';
 
   // Populate fields
   document.getElementById('d-title').textContent = it.title;
