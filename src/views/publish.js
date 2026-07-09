@@ -177,6 +177,26 @@ export function initFormListener() {
   if (previewBtn) { previewBtn.addEventListener('click', function(ev) { ev.preventDefault(); togglePreview(); }); }
   initShippingToggle();
   initCityDropdown();
+
+  // 初始化上传器事件委托
+  const uploader = document.getElementById('uploader');
+  if (uploader && !uploader.dataset.bound) {
+    uploader.dataset.bound = '1';
+    uploader.addEventListener('click', function(e) {
+      const x = e.target.closest('[data-remove]');
+      if (x) {
+        e.stopPropagation();
+        removeImg(Number(x.dataset.remove));
+        return;
+      }
+      const add = e.target.closest('[data-add]');
+      if (add) {
+        e.stopPropagation();
+        document.getElementById('f-files').click();
+      }
+    });
+  }
+
   formListenerBound = true;
 }
 
