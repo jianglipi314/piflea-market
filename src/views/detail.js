@@ -194,7 +194,6 @@ export async function openDetail(id) {
     buyBtn.style.opacity = '1';
   }
   document.getElementById('d-fab').style.display = 'flex';
-  drawFakeQR(id);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -206,65 +205,6 @@ export function fakeBuy() {
   if (!id) { toast('请先选择商品'); return; }
   // Dynamic import to avoid circular dependency
   import('./order').then((mod) => mod.openOrder(id));
-}
-
-function drawFakeQR(id) {
-  const canvas = document.getElementById('qrCanvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const size = 21;
-  const cell = Math.floor(96 / size);
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, 96, 96);
-  ctx.fillStyle = '#111';
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      h = (h * 1103515245 + 12345) >>> 0;
-      const on = h % 7 < 3;
-      const inCorner =
-        (x < 7 && y < 7) ||
-        (x >= size - 7 && y < 7) ||
-        (x < 7 && y >= size - 7);
-      const cornerBorder =
-        inCorner &&
-        (x === 0 ||
-          x === 6 ||
-          y === 0 ||
-          y === 6 ||
-          x === size - 1 ||
-          x === size - 7 ||
-          y === size - 1 ||
-          y === size - 7);
-      const cornerInner =
-        inCorner &&
-        ((x >= 2 && x <= 4 && y >= 2 && y <= 4) ||
-          (x >= 2 && x <= 4 && y >= size - 5 && y <= size - 3) ||
-          (x >= size - 5 && x <= size - 3 && y >= 2 && y <= 4));
-      if (on || cornerBorder || cornerInner)
-        ctx.fillRect(x * cell, y * cell, cell, cell);
-    }
-  }
-  // Show the item URL as text overlay
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillRect(0, 76, 96, 20);
-  ctx.fillStyle = '#333';
-  ctx.font = '9px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('#ID: ' + id, 48, 88);
-
-  // Bind click handler directly to canvas (instead of global document listener)
-  canvas.onclick = () => {
-    if (!state.currentDetailId) return;
-    const link = `https://piflea.com/item/${state.currentDetailId}`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link).then(() => toast('已复制链接'));
-    } else {
-      fallbackCopy(link);
-      toast('已复制链接到剪贴板');
-    }
-  };
 }
 
 /**
