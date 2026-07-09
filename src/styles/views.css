@@ -362,7 +362,8 @@
 
 /* ============ Detail ============ */
 .hero {
-  height: 280px;
+  height: 300px;
+  min-height: 200px;
   background: linear-gradient(135deg, #f0f3fa, #fef0ea);
   border-radius: 0 0 18px 18px;
   position: relative;
@@ -370,7 +371,7 @@
   place-items: center;
   font-size: 90px;
   color: #b8bfd1;
-  margin: -12px -14px 0;
+  margin: 0 -14px 0;
   position: relative;
   overflow: hidden;
   cursor: pointer;
@@ -430,7 +431,7 @@
   background: var(--card);
   border-radius: var(--radius);
   padding: 14px;
-  margin-top: -20px;
+  margin-top: 0;
   position: relative;
   box-shadow: var(--shadow);
 }
