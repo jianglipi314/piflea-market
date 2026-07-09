@@ -5,6 +5,9 @@
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_company TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_no TEXT;
 
+-- 添加运费字段到商品表
+ALTER TABLE items ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0;
+
 -- 添加索引提升查询性能
 CREATE INDEX IF NOT EXISTS idx_orders_payment_id ON orders(payment_id);
 CREATE INDEX IF NOT EXISTS idx_orders_buyer_id ON orders(buyer_id);

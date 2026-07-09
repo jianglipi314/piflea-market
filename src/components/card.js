@@ -42,7 +42,7 @@ export function cardHTML(it) {
       <p class="title">${escapeHtml(it.title)}</p>
       <div class="price-row">
         <div class="price">${fmtPrice(it.price)} π</div>
-        <div style="font-size:11px;color:var(--ink-2)">${it.cat}</div>
+        <div style="font-size:11px;color:var(--ink-2)">${it.cat}${it.shipping_fee > 0 ? ' · 运费' + fmtPrice(it.shipping_fee) + 'π' : ' · 包邮'}</div>
       </div>
       <div class="seller">
         <div class="avatar">${(it.seller || 'U').slice(0, 1)}</div>

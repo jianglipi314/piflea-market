@@ -66,10 +66,19 @@ export function openOrder(id) {
   }
 
   const price = Number(it.price) || 0;
+  const shippingFee = Number(it.shipping_fee) || 0;
   const platformFee = FEE_MODE === 'A' ? 0 : (FEE_MODE === 'B' ? price * PLATFORM_FEE_RATE : 0);
-  const total = price + platformFee + NETWORK_FEE;
+  const total = price + shippingFee + platformFee + NETWORK_FEE;
 
   document.getElementById('o-item-price').textContent = fmtPrice(price) + ' \u03C0';
+  const shippingEl = document.getElementById('o-shipping-fee');
+  if (shippingFee > 0) {
+    shippingEl.textContent = fmtPrice(shippingFee) + ' \u03C0';
+    shippingEl.style.color = 'var(--ink)';
+  } else {
+    shippingEl.textContent = '\u5305\u90AE';
+    shippingEl.style.color = 'var(--ok)';
+  }
   if (FEE_MODE === 'A') {
     document.getElementById('o-fee').innerHTML = '\u{1F389} 0.00 \u03C0 <span style="font-size:11px;color:var(--ok)">\u9650\u65F6\u514D\u8D39</span>';
   } else {

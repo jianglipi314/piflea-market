@@ -79,6 +79,14 @@
         <div class="row"><label>价格（π）</label><input id="f-price" type="number" step="0.01" min="0.01" placeholder="2.5" required/></div>
         <div class="row"><label>所在城市</label><input id="f-city" placeholder="北京 · 海淀" maxlength="20"/></div>
       </div>
+      <div class="row"><label>运费</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button type="button" id="ship-free" class="ship-toggle on" style="padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:var(--ink);color:#fff;font-size:13px;cursor:pointer">包邮</button>
+          <button type="button" id="ship-fee" class="ship-toggle" style="padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);font-size:13px;cursor:pointer">运费</button>
+          <input id="f-shipping" type="number" step="0.01" min="0" placeholder="运费金额" style="display:none;width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+          <span style="font-size:11px;color:var(--ink-2)">π</span>
+        </div>
+      </div>
       <div class="row"><label>商品描述</label><textarea id="f-desc" placeholder="买了多久、是否带包装、是否有瑕疵、可面交地点..." required></textarea></div>
       <div class="row"><label>图片（最多 6 张，上传到云端）</label>
         <div class="img-uploader" id="uploader">
@@ -166,6 +174,10 @@
       <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px">
         <span style="color:var(--ink-2)">商品金额</span>
         <span id="o-item-price" style="font-weight:600">0.00 π</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px">
+        <span style="color:var(--ink-2)">运费</span>
+        <span id="o-shipping-fee" style="font-weight:600">包邮</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px">
         <span style="color:var(--ink-2)">平台服务费</span>

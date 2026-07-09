@@ -6,6 +6,51 @@ import { CAT_ICON, LOC_KEY } from '../state';
 import { getPiUser } from '../pi-sdk';
 import { escapeHtml, fmtPrice, toast, getCurrentUserId, getAllMyUserIds } from '../utils';
 import { goto } from '../router';
+
+let shippingMode = 'free'; // 'free' or 'fee'
+
+export function initShippingToggle() {
+  const btnFree = document.getElementById('ship-free');
+  const btnFee = document.getElementById('ship-fee');
+  const input = document.getElementById('f-shipping');
+  if (!btnFree || !btnFee) return;
+
+  btnFree.addEventListener('click', () => {
+    shippingMode = 'free';
+    btnFree.style.background = 'var(--ink)';
+    btnFree.style.color = '#fff';
+    btnFee.style.background = 'var(--card)';
+    btnFee.style.color = 'var(--ink-2)';
+    input.style.display = 'none';
+    input.value = '';
+  });
+
+  btnFee.addEventListener('click', () => {
+    shippingMode = 'fee';
+    btnFee.style.background = 'var(--ink)';
+    btnFee.style.color = '#fff';
+    btnFree.style.background = 'var(--card)';
+    btnFree.style.color = 'var(--ink-2)';
+    input.style.display = 'block';
+    input.focus();
+  });
+}
+
+export function getShippingFee() {
+  if (shippingMode === 'free') return 0;
+  const val = parseFloat(document.getElementById('f-shipping').value) || 0;
+  return val;
+}
+
+export function resetShippingToggle() {
+  shippingMode = 'free';
+  const btnFree = document.getElementById('ship-free');
+  const btnFee = document.getElementById('ship-fee');
+  const input = document.getElementById('f-shipping');
+  if (btnFree) { btnFree.style.background = 'var(--ink)'; btnFree.style.color = '#fff'; }
+  if (btnFee) { btnFee.style.background = 'var(--card)'; btnFee.style.color = 'var(--ink-2)'; }
+  if (input) { input.style.display = 'none'; input.value = ''; }
+}
 import { loadItems } from './home';
 
 const IMAGE_MAX_WIDTH = 800;
@@ -38,6 +83,7 @@ export function initFormListener() {
   if (clearBtn) { clearBtn.addEventListener('click', function(ev) { ev.preventDefault(); clearForm(); }); }
   const previewBtn = document.getElementById('btnPreview');
   if (previewBtn) { previewBtn.addEventListener('click', function(ev) { ev.preventDefault(); togglePreview(); }); }
+  initShippingToggle();
   formListenerBound = true;
 }
 
@@ -50,6 +96,7 @@ export function clearForm() {
   renderUploader();
   document.getElementById('preview').style.display = 'none';
   setStep(1);
+  resetShippingToggle();
 
   const submitBtn = document.getElementById('f-submit');
   if (submitBtn) submitBtn.textContent = '免费发布';
@@ -257,6 +304,7 @@ export async function doPublish(ev) {
     }
     await submitItem({
       title, price, cat, desc, seller, city, contact,
+      shipping_fee: getShippingFee(),
       images: uploadedUrls,
       owner_id: getCurrentUserId(),
     });
@@ -287,6 +335,7 @@ async function submitItem(data) {
         seller: data.seller,
         city: data.city,
         contact: data.contact || '',
+        shipping_fee: data.shipping_fee || 0,
         images: data.images,
       })
       .eq('id', state.editId)
@@ -303,6 +352,7 @@ async function submitItem(data) {
         seller: data.seller,
         city: data.city,
         contact: data.contact || '',
+        shipping_fee: data.shipping_fee || 0,
         images: data.images,
         views: 0,
         fav_count: 0,

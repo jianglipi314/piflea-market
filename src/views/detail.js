@@ -81,7 +81,7 @@ export async function openDetail(id) {
   document.getElementById('d-emoji').textContent = it.emoji || '📦';
   document.getElementById('d-loc').textContent = it.city || '—';
   document.getElementById('d-seller-sub').textContent =
-    '平台认证卖家 · 👁 ' + (it.views || 0) + ' 次浏览';
+    (it.shipping_fee > 0 ? '运费 ' + fmtPrice(it.shipping_fee) + ' π · ' : '包邮 · ') + '👁 ' + (it.views || 0) + ' 次浏览';
 
   // Contact info
   const contactRow = document.getElementById('d-contact-row');
