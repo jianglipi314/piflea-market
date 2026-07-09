@@ -125,19 +125,37 @@ export async function openDetail(id) {
   const emojiEl = document.getElementById('d-emoji');
   const dots = document.getElementById('d-dots');
 
+  // Build gallery container for swipe
+  let gallery = hero.querySelector('.hero-gallery');
+  if (!gallery) {
+    gallery = document.createElement('div');
+    gallery.className = 'hero-gallery';
+    hero.insertBefore(gallery, hero.querySelector('.gallery-dots') || null);
+  }
+
   if (it.images && it.images.length) {
     emojiEl.style.display = 'none';
-    let img = hero.querySelector('img');
-    if (!img) {
-      img = document.createElement('img');
-      hero.insertBefore(img, hero.querySelector('.gallery-dots') || null);
-    }
-    img.decoding = 'async';
-    img.src = it.images[0];
+    gallery.innerHTML = it.images.map((src, i) =>
+      `<img src="${src}" decoding="async" style="min-width:100%;object-fit:cover;display:block" data-idx="${i}"/>`
+    ).join('');
+    gallery.style.display = 'flex';
+    gallery.style.overflow = 'hidden';
+    gallery.style.scrollSnapType = 'x mandatory';
+    gallery.style.width = '100%';
+    gallery.style.height = '100%';
+    gallery.style.scrollBehavior = 'smooth';
+
+    // Ensure each img has scroll-snap
+    gallery.querySelectorAll('img').forEach(img => {
+      img.style.scrollSnapAlign = 'start';
+    });
+
+    // Reset scroll
+    gallery.scrollLeft = 0;
   } else {
     emojiEl.style.display = '';
-    const old = hero.querySelector('img');
-    if (old) old.remove();
+    gallery.innerHTML = '';
+    gallery.style.display = 'none';
     emojiEl.textContent = it.emoji || '📦';
   }
 
@@ -146,19 +164,25 @@ export async function openDetail(id) {
       ? it.images.map((_, i) => `<span class="${i === 0 ? 'on' : ''}"></span>`).join('')
       : '';
 
+  // Update dots on scroll
+  gallery.onscroll = () => {
+    const idx = Math.round(gallery.scrollLeft / gallery.offsetWidth);
+    if (idx !== heroImgIdx) {
+      heroImgIdx = idx;
+      dots.querySelectorAll('span').forEach((s, i) =>
+        s.classList.toggle('on', i === heroImgIdx)
+      );
+    }
+  };
+
+  // Click to go to next image (fallback when swipe doesn't work)
   hero.onclick = (e) => {
     if (!it.images || !it.images.length) return;
-    // 兼容 Pi Browser：同时检查 closest 和 tagName
     const tg = e.target.closest ? (e.target.closest('.back') || e.target.closest('.share')) : null;
     if (tg) return;
-    // 额外检查：如果点击的是 button 元素，不触发图片切换
     if (e.target.tagName === 'BUTTON') return;
     heroImgIdx = (heroImgIdx + 1) % it.images.length;
-    const img = hero.querySelector('img');
-    if (img) img.src = it.images[heroImgIdx];
-    dots.querySelectorAll('span').forEach((s, i) =>
-      s.classList.toggle('on', i === heroImgIdx)
-    );
+    gallery.scrollTo({ left: heroImgIdx * gallery.offsetWidth, behavior: 'smooth' });
   };
 
   // 返回按钮用 addEventListener，不依赖内联 onclick（Pi Browser 兼容）
