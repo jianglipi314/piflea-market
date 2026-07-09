@@ -81,13 +81,6 @@ export function setSort(s) {
 export function renderHome() {
   document.getElementById('listLoader').style.display = 'none';
 
-  // Quick category icons
-  const icons = ['cat2', 'cat3', 'cat4', 'cat5', 'cat6', 'cat7', 'cat8', ''];
-  document.getElementById('quick').innerHTML = CATS.map(
-    (c, i) =>
-      `<div class="q" data-cat="${c}"><div class="q-icon ${icons[i - 1] || ''}">${CAT_ICON[c]}</div><span>${c}</span></div>`
-  ).join('');
-
   // Category chips
   document.getElementById('cats').innerHTML = CATS.map(
     (c) =>
@@ -115,14 +108,6 @@ export function renderHome() {
   document.getElementById('list').innerHTML = items.map((it) => cardHTML(it)).join('');
 
   // 事件委托（替换内联 onclick，兼容 Pi Browser）
-  const quickEl = document.getElementById('quick');
-  if (quickEl && !quickEl.dataset.bound) {
-    quickEl.dataset.bound = '1';
-    quickEl.addEventListener('click', function(e) {
-      const q = e.target.closest('[data-cat]');
-      if (q) setCat(q.dataset.cat);
-    });
-  }
   const catsEl = document.getElementById('cats');
   if (catsEl && !catsEl.dataset.bound) {
     catsEl.dataset.bound = '1';
