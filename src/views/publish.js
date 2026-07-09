@@ -51,6 +51,60 @@ export function resetShippingToggle() {
   if (btnFee) { btnFee.style.background = 'var(--card)'; btnFee.style.color = 'var(--ink-2)'; }
   if (input) { input.style.display = 'none'; input.value = ''; }
 }
+
+/* ============ City Dropdown ============ */
+const CITIES = [
+  '北京', '上海', '广州', '深圳', '杭州', '南京', '成都', '武汉', '重庆', '西安',
+  '天津', '苏州', '长沙', '郑州', '青岛', '大连', '宁波', '厦门', '福州', '无锡',
+  '合肥', '济南', '哈尔滨', '沈阳', '长春', '昆明', '贵阳', '南宁', '海口', '兰州',
+  '石家庄', '太原', '呼和浩特', '银川', '西宁', '乌鲁木齐', '拉萨', '南昌', '珠海', '东莞',
+  '佛山', '惠州', '温州', '绍兴', '烟台', '潍坊', '保定', '徐州', '洛阳', '邯郸',
+];
+
+export function initCityDropdown() {
+  const input = document.getElementById('f-city');
+  const dropdown = document.getElementById('city-dropdown');
+  if (!input || !dropdown || input._cityBound) return;
+  input._cityBound = true;
+
+  function renderList(filter) {
+    const filtered = filter
+      ? CITIES.filter(c => c.includes(filter) || filter.includes(c))
+      : CITIES;
+    if (filtered.length === 0) {
+      dropdown.innerHTML = '<div style="padding:10px;color:var(--ink-2);font-size:13px">无匹配城市</div>';
+      return;
+    }
+    dropdown.innerHTML = filtered.map(c =>
+      '<div class="city-item" data-city="' + c + '" style="padding:10px 14px;font-size:14px;cursor:pointer;border-radius:4px">' + c + '</div>'
+    ).join('');
+  }
+
+  input.addEventListener('focus', () => {
+    renderList(input.value.trim());
+    dropdown.style.display = 'block';
+  });
+
+  input.addEventListener('input', () => {
+    renderList(input.value.trim());
+    dropdown.style.display = 'block';
+  });
+
+  dropdown.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-city]');
+    if (item) {
+      input.value = item.dataset.city;
+      dropdown.style.display = 'none';
+    }
+  });
+
+  // 点击外部关闭下拉
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+}
 import { loadItems } from './home';
 
 const IMAGE_MAX_WIDTH = 800;
@@ -84,6 +138,7 @@ export function initFormListener() {
   const previewBtn = document.getElementById('btnPreview');
   if (previewBtn) { previewBtn.addEventListener('click', function(ev) { ev.preventDefault(); togglePreview(); }); }
   initShippingToggle();
+  initCityDropdown();
   formListenerBound = true;
 }
 
