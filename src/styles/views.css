@@ -538,16 +538,16 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: 56px;
   max-width: 460px;
   margin: 0 auto;
   background: var(--card);
   border-top: 1px solid var(--line);
-  padding: 10px 14px calc(14px + env(safe-area-inset-bottom));
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
   display: flex;
   gap: 10px;
   align-items: center;
-  z-index: 20;
+  z-index: 31;
 }
 
 .detail-fab .btn {
