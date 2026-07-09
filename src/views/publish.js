@@ -123,6 +123,7 @@ export function initCityDropdown() {
   });
 
   dropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
     const prov = e.target.closest('[data-province]');
     const city = e.target.closest('[data-city]');
     const back = e.target.closest('[data-back]');
