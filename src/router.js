@@ -9,7 +9,7 @@ import { renderAdmin } from './views/admin';
 import { clearForm, initFormListener } from './views/publish';
 
 const viewTitles = {
-  home:   ['π 跳蚤市场', '先锋二手 · 为派赋能'],
+  home:   ['pi 跳蚤市场', '先锋二手 · 为派赋能'],
   search: ['搜索', '关键词 / 分类 / 排序'],
   publish: ['发布商品', '免费发布'],
   detail: ['商品详情', '平台担保交易 · 收货后放款'],
