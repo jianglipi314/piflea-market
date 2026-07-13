@@ -3,6 +3,7 @@ import { escapeHtml, fmtPrice, toast } from '../utils';
 import { createPiPayment, isPiAuthenticated, getPiUser } from '../pi-sdk';
 import { goto } from '../router';
 import { apiFetch, BACKEND_URL as BACKEND } from '../api';
+import { loadOrders } from './mine';
 
 const FEE_MODE = 'A';
 const NETWORK_FEE = 0;
@@ -10,6 +11,13 @@ const PLATFORM_FEE_RATE = 0.02;
 
 let currentOrderItem = null;
 let lastPaymentId = null;
+
+function calcTotal(it) {
+  const price = Number(it.price) || 0;
+  const shippingFee = Number(it.shipping_fee) || 0;
+  const platformFee = FEE_MODE === 'A' ? 0 : (FEE_MODE === 'B' ? price * PLATFORM_FEE_RATE : 0);
+  return { price, shippingFee, platformFee, total: price + shippingFee + platformFee + NETWORK_FEE };
+}
 
 export function openOrder(id) {
   const it = state.items.find((x) => x.id === id);
@@ -65,10 +73,7 @@ export function openOrder(id) {
     document.getElementById('o-emoji').style.display = '';
   }
 
-  const price = Number(it.price) || 0;
-  const shippingFee = Number(it.shipping_fee) || 0;
-  const platformFee = FEE_MODE === 'A' ? 0 : (FEE_MODE === 'B' ? price * PLATFORM_FEE_RATE : 0);
-  const total = price + shippingFee + platformFee + NETWORK_FEE;
+  const { price, shippingFee, platformFee, total } = calcTotal(it);
 
   document.getElementById('o-item-price').textContent = fmtPrice(price) + ' \u03C0';
   const shippingEl = document.getElementById('o-shipping-fee');
@@ -114,7 +119,7 @@ async function createOrder(paymentId, txid) {
         item_id: item.id,
         item_title: item.title || '',
         item_price: item.price || 0,
-        amount: Number(item.price || 0) + NETWORK_FEE,
+        amount: calcTotal(item).total,
         memo: 'Piflea: ' + (item.title || '')
       })
     });
@@ -134,9 +139,7 @@ export function confirmPayment() {
   btn.disabled = true;
   btn.textContent = '\u652F\u4ED8\u5904\u7406\u4E2D...';
 
-  const price = Number(currentOrderItem.price) || 0;
-  const platformFee = FEE_MODE === 'A' ? 0 : (FEE_MODE === 'B' ? price * PLATFORM_FEE_RATE : 0);
-  const total = price + platformFee + NETWORK_FEE;
+  const { total } = calcTotal(currentOrderItem);
 
   const piUser = getPiUser();
   createPiPayment(
@@ -157,8 +160,13 @@ export function confirmPayment() {
       btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
       if (success && paymentId && txid) {
         // Save order to database
-        createOrder(paymentId, txid);
-        showPaymentSuccess(total);
+        createOrder(paymentId, txid).then(() => {
+          showPaymentSuccess(total);
+        }).catch(err => {
+          console.error('createOrder error:', err);
+          toast('订单创建失败，请联系客服');
+          showPaymentSuccess(total);
+        });
       } else if (msg) {
         toast('\u652F\u4ED8\u5931\u8D25\uFF1A' + msg);
       }
@@ -207,6 +215,8 @@ function showPaymentSuccess(amount) {
   const okBtn = modal.querySelector('#pay-success-btn');
   okBtn.addEventListener('click', function() {
     modal.remove();
+    loadOrders('buyer');
+    loadOrders('seller');
     goto('mine');
   });
 
@@ -214,6 +224,8 @@ function showPaymentSuccess(amount) {
   modal.addEventListener('click', function(e) {
     if (e.target === modal) {
       modal.remove();
+      loadOrders('buyer');
+      loadOrders('seller');
       goto('mine');
     }
   });

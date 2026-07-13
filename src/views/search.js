@@ -42,7 +42,8 @@ export function renderTagCloud() {
  * Perform the search query.
  */
 export async function doSearch() {
-  const q = document.getElementById('qInput').value.trim().toLowerCase();
+  const qRaw = document.getElementById('qInput').value.trim();
+  const q = qRaw.toLowerCase();
   const list = document.getElementById('searchList');
   const empty = document.getElementById('searchEmpty');
   const loader = document.getElementById('searchLoader');
@@ -60,11 +61,12 @@ export async function doSearch() {
 
   try {
     // Remove special characters that could interfere with ilike pattern matching
-    const safeQ = q.replace(/[%_\\]/g, '');
+    const safeQ = q.replace(/[%_\\,]/g, '');
     const supabase = getSupabase();
     let query = supabase
       .from('items')
       .select('*')
+      .eq('status', 'active')
       .or(
         `title.ilike.%${safeQ}%,description.ilike.%${safeQ}%,category.ilike.%${safeQ}%,seller.ilike.%${safeQ}%,city.ilike.%${safeQ}%`
       );
@@ -80,7 +82,7 @@ export async function doSearch() {
       empty.style.display = 'none';
     } else {
       empty.style.display = 'block';
-      empty.textContent = `没有找到 "${q}" 相关商品`;
+      empty.textContent = `没有找到 "${qRaw}" 相关商品`;
     }
     list.innerHTML = results.map((it) => cardHTML(it)).join('');
   } catch (e) {

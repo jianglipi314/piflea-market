@@ -171,6 +171,7 @@ export function decodeItem(d) {
     images: d.images || [],
     city: d.city || '',
     contact: d.contact || '',
+    shipping_fee: Number(d.shipping_fee) || 0,
     fav: d.fav_count || 0,
     owner_id: d.owner_id || '',
     views: d.views || 0,

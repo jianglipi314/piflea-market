@@ -80,8 +80,7 @@ export function renderMine() {
   const myIds = getAllMyUserIds();
   const myItems = state.items.filter(
     (it) =>
-      (it.owner_id && myIds.includes(it.owner_id)) ||
-      (it.seller || '') === me
+      (it.owner_id && myIds.includes(it.owner_id))
   );
 
   // 默认显示概览页（不直接进入任何 tab）

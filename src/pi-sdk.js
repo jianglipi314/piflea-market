@@ -49,14 +49,14 @@ export function initPiAndAuthenticate(callback) {
             if (callback) callback(piUser);
 
             // 静默重新认证，确保获取 payments scope
-            // 如果 Pi SDK 已有完整权限（含 payments），这次调用不会弹框
-            // 如果缺少 payments scope，Pi SDK 会弹框请求
             silentReAuth();
           } catch (e) {
             debug('Failed to parse cached user', true);
+            if (callback) callback(null);
           }
+        } else {
+          if (callback) callback(null);
         }
-        if (callback) callback(null);
       };
       
       if (initResult && typeof initResult.then === 'function') {
@@ -234,121 +234,129 @@ export function getPiUser() {
 export function createPiPayment(amount, memo, metadata = {}, onComplete) {
   debug('createPiPayment called, amount: ' + amount);
 
-  if (!window.Pi) {
-    debug('window.Pi is undefined', true);
-    toast('Pi SDK 不可用');
-    if (onComplete) onComplete(false, 'Pi SDK 不可用');
-    return;
-  }
-
-  if (typeof window.Pi.createPayment !== 'function') {
-    debug('window.Pi.createPayment is not a function', true);
-    toast('Pi SDK createPayment 不可用');
-    if (onComplete) onComplete(false, 'Pi SDK createPayment 不可用');
-    return;
-  }
-
-  if (!piUser) {
-    debug('piUser is null, user not logged in', true);
-    toast('请先登录 Pi 账号');
-    if (onComplete) onComplete(false, '请先登录 Pi 账号');
-    return;
-  }
-
-  debug('User logged in: ' + piUser.username);
-
-  // Timeout to prevent hanging
-  let timeoutId = setTimeout(() => {
-    debug('Payment timeout - no callback fired within 30s', true);
-    toast('支付超时，请重试');
-    if (onComplete) onComplete(false, '支付超时');
-  }, 30000);
-
-  const resetButton = (paymentId, txid) => {
-    clearTimeout(timeoutId);
-    if (onComplete) onComplete(true, null, paymentId, txid);
-  };
-
-  const failButton = (msg) => {
-    clearTimeout(timeoutId);
-    if (onComplete) onComplete(false, msg);
-  };
-
-  ensureInit().then(() => {
-    debug('Creating payment...');
-
-    const paymentData = {
-      amount: String(amount),
-      memo: memo || 'Piflea payment',
-      metadata: { app: 'piflea-market', ...metadata },
-      uid: piUser.uid,
+  return new Promise((resolve, reject) => {
+    const callback = (success, msg, paymentId, txid) => {
+      if (onComplete) onComplete(success, msg, paymentId, txid);
+      if (success) resolve({ paymentId, txid });
+      else reject(new Error(msg || '支付失败'));
     };
 
-    try {
-      window.Pi.createPayment(paymentData, {
-        onReadyForServerApproval: function (paymentId) {
-          console.log('[DEBUG] onReadyForServerApproval triggered! paymentId:', paymentId);
-          debug('onReadyForServerApproval: ' + paymentId);
-          toast('支付等待确认');
-          apiFetch('/api/approve', {
-            method: 'POST',
-            body: JSON.stringify({
-              paymentId,
-              buyerId: metadata.buyerId,
-              sellerId: metadata.sellerId,
-              itemId: metadata.itemId,
-              itemTitle: metadata.itemTitle,
-              itemPrice: metadata.itemPrice,
-              amount: metadata.amount,
-            }),
-          }).then(r => r.json()).catch(e => {
-            console.error('[DEBUG] approve err:', e);
-            debug('approve err: ' + e, true);
-          });
-        },
-        onReadyForServerCompletion: function (paymentId, txid) {
-          console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid);
-          debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
-          toast('✅ 支付完成！正在创建订单...');
-          apiFetch('/api/complete', {
-            method: 'POST',
-            body: JSON.stringify({ paymentId, txid }),
-          }).then(r => r.json()).catch(e => {
-            console.error('[DEBUG] complete err:', e);
-            debug('complete err: ' + e, true);
-          });
-          resetButton(paymentId, txid);
-        },
-        onCancel: function (paymentId) {
-          debug('onCancel: ' + paymentId);
-          toast('支付已取消');
-          resetButton();
-        },
-        onError: function (error, payment) {
-          const msg = error?.message || error || '未知错误';
-          debug('onError: ' + msg, true);
-
-          // 检测是否缺少 payments scope
-          const noPermission = msg.includes('payments') || msg.includes('permission') || msg.includes('scope') || msg.includes('unauthorized');
-          if (noPermission) {
-            toast('缺少支付权限，请退出账号后重新登录并勾选 payments 权限');
-            failButton('缺少支付权限，请退出账号后重新登录');
-          } else {
-            toast('支付失败：' + msg);
-            failButton(msg);
-          }
-        },
-      });
-
-      debug('createPayment called successfully');
-    } catch (e) {
-      debug('createPayment exception: ' + e.message, true);
-      toast('支付异常：' + e.message);
-      failButton(e.message);
+    if (!window.Pi) {
+      debug('window.Pi is undefined', true);
+      toast('Pi SDK 不可用');
+      callback(false, 'Pi SDK 不可用');
+      return;
     }
-  }).catch(e => {
-    debug('ensureInit error: ' + e.message, true);
-    toast('Pi SDK 初始化失败：' + e.message);
-    failButton('Pi SDK 初始化失败');
+
+    if (typeof window.Pi.createPayment !== 'function') {
+      debug('window.Pi.createPayment is not a function', true);
+      toast('Pi SDK createPayment 不可用');
+      callback(false, 'Pi SDK createPayment 不可用');
+      return;
+    }
+
+    if (!piUser) {
+      debug('piUser is null, user not logged in', true);
+      toast('请先登录 Pi 账号');
+      callback(false, '请先登录 Pi 账号');
+      return;
+    }
+
+    debug('User logged in: ' + piUser.username);
+
+    // Timeout to prevent hanging
+    let timeoutId = setTimeout(() => {
+      debug('Payment timeout - no callback fired within 30s', true);
+      toast('支付超时，请重试');
+      callback(false, '支付超时');
+    }, 30000);
+
+    const resetButton = (paymentId, txid) => {
+      clearTimeout(timeoutId);
+      callback(true, null, paymentId, txid);
+    };
+
+    const failButton = (msg) => {
+      clearTimeout(timeoutId);
+      callback(false, msg);
+    };
+
+    ensureInit().then(() => {
+      debug('Creating payment...');
+
+      const paymentData = {
+        amount: String(amount),
+        memo: memo || 'Piflea payment',
+        metadata: { app: 'piflea-market', ...metadata },
+        uid: piUser.uid,
+      };
+
+      try {
+        window.Pi.createPayment(paymentData, {
+          onReadyForServerApproval: function (paymentId) {
+            console.log('[DEBUG] onReadyForServerApproval triggered! paymentId:', paymentId);
+            debug('onReadyForServerApproval: ' + paymentId);
+            toast('支付等待确认');
+            apiFetch('/api/approve', {
+              method: 'POST',
+              body: JSON.stringify({
+                paymentId,
+                buyerId: metadata.buyerId,
+                sellerId: metadata.sellerId,
+                itemId: metadata.itemId,
+                itemTitle: metadata.itemTitle,
+                itemPrice: metadata.itemPrice,
+                amount: metadata.amount,
+              }),
+            }).then(r => r.json()).catch(e => {
+              console.error('[DEBUG] approve err:', e);
+              debug('approve err: ' + e, true);
+            });
+          },
+          onReadyForServerCompletion: function (paymentId, txid) {
+            console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid);
+            debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
+            toast('✅ 支付完成！正在创建订单...');
+            apiFetch('/api/complete', {
+              method: 'POST',
+              body: JSON.stringify({ paymentId, txid }),
+            }).then(r => r.json()).catch(e => {
+              console.error('[DEBUG] complete err:', e);
+              debug('complete err: ' + e, true);
+            });
+            resetButton(paymentId, txid);
+          },
+          onCancel: function (paymentId) {
+            debug('onCancel: ' + paymentId);
+            toast('支付已取消');
+            failButton('支付已取消');
+          },
+          onError: function (error, payment) {
+            const msg = error?.message || error || '未知错误';
+            debug('onError: ' + msg, true);
+
+            // 检测是否缺少 payments scope
+            const noPermission = msg.includes('payments') || msg.includes('permission') || msg.includes('scope') || msg.includes('unauthorized');
+            if (noPermission) {
+              toast('缺少支付权限，请退出账号后重新登录并勾选 payments 权限');
+              failButton('缺少支付权限，请退出账号后重新登录');
+            } else {
+              toast('支付失败：' + msg);
+              failButton(msg);
+            }
+          },
+        });
+
+        debug('createPayment called successfully');
+      } catch (e) {
+        debug('createPayment exception: ' + e.message, true);
+        toast('支付异常：' + e.message);
+        failButton(e.message);
+      }
+    }).catch(e => {
+      debug('ensureInit error: ' + e.message, true);
+      toast('Pi SDK 初始化失败：' + e.message);
+      failButton('Pi SDK 初始化失败');
+    });
   });
 }

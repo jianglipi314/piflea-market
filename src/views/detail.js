@@ -187,18 +187,19 @@ export async function openDetail(id) {
 
   // 返回按钮用 addEventListener，不依赖内联 onclick（Pi Browser 兼容）
   const backBtn = document.getElementById('detail-back-btn');
-  if (backBtn) {
+  if (backBtn && !backBtn._bound) {
+    backBtn._bound = true;
     backBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       e.preventDefault();
-      console.log('[detail] 返回按钮点击');
       goto('home');
     });
   }
 
   // 分享按钮
-  const shareBtn = document.getElementById('detail-share-btn');
-  if (shareBtn) {
+  const shareBtn = document.getElementById('d-share-btn');
+  if (shareBtn && !shareBtn._bound) {
+    shareBtn._bound = true;
     shareBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       e.preventDefault();

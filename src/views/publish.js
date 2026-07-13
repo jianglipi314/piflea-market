@@ -39,7 +39,7 @@ export function initShippingToggle() {
 export function getShippingFee() {
   if (shippingMode === 'free') return 0;
   const val = parseFloat(document.getElementById('f-shipping').value) || 0;
-  return val;
+  return Math.max(0, val);
 }
 
 export function resetShippingToggle() {
@@ -487,9 +487,9 @@ async function submitItem(data) {
   toast(isEdit ? '✅ 修改成功' : '✅ 发布成功！商品已同步到云端');
   setStep(3);
   state.editId = null;
-  clearForm();
 
   setTimeout(() => {
+    clearForm();
     loadItems();
     goto('mine');
   }, 800);
@@ -524,6 +524,17 @@ export async function openEdit(id) {
   document.getElementById('f-city').value = it.city || '';
   document.getElementById('f-desc').value = it.desc || '';
   document.getElementById('f-contact').value = it.contact || '';
+
+  // Restore shipping fee
+  if (it.shipping_fee > 0) {
+    shippingMode = 'fee';
+    const btnFree = document.getElementById('ship-free');
+    const btnFee = document.getElementById('ship-fee');
+    const shipInput = document.getElementById('f-shipping');
+    if (btnFree) { btnFree.style.background = 'var(--card)'; btnFree.style.color = 'var(--ink-2)'; }
+    if (btnFee) { btnFee.style.background = 'var(--ink)'; btnFee.style.color = '#fff'; }
+    if (shipInput) { shipInput.style.display = 'block'; shipInput.value = it.shipping_fee; }
+  }
 
   // Restore images from URLs
   uploadImages = (it.images || []).slice();

@@ -19,7 +19,7 @@ export function initChatButtons() {
   const blockBtn = document.getElementById('chat-block-btn');
   if (blockBtn && !blockBtn._bound) {
     blockBtn._bound = true;
-    blockBtn.addEventListener('click', () => toast('已屏蔽该卖家（Demo）'));
+    blockBtn.addEventListener('click', () => toast('举报功能即将上线'));
   }
   const sendBtn = document.getElementById('chat-send-btn');
   if (sendBtn && !sendBtn._bound) {
@@ -72,7 +72,7 @@ export async function loadChatList() {
   const count = document.getElementById('chatCount');
   const myIds = getAllMyUserIds();
   const orExpr = myIds.map(id => 'from_uid.eq.' + id + ',to_uid.eq.' + id).join(',');
-  const me = myIds[0] || '';
+  const me = getCurrentUserId();
 
   const { data, error } = await supabase
     .from('chat_messages')
