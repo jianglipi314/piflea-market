@@ -1,12 +1,23 @@
 /* ============ Home ============ */
 .city-item:hover { background: var(--bg); }
+
+/* 首页统一左右留白 16px，保证 Banner/分类/排序/列表左缘对齐 */
+#view-home {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* Banner — v1.1 视觉美化（保持原 DOM：.banner/.coin/.cta） */
 .banner {
   margin-top: 6px;
   border-radius: var(--radius);
-  padding: 18px 18px 16px;
-  background: linear-gradient(135deg, #ff5533 0%, #ff8f3f 55%, #ffd23f 100%);
+  min-height: 160px;
+  padding: 20px 18px 18px;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(255, 210, 63, 0.35) 0%, transparent 55%),
+    linear-gradient(135deg, #ff4d2d 0%, #ff7a2f 55%, #ff9d3f 100%);
   color: #fff;
-  box-shadow: var(--shadow);
+  box-shadow: 0 8px 22px rgba(255, 85, 51, 0.18);
   position: relative;
   overflow: hidden;
 }
@@ -14,6 +25,11 @@
 .banner h2 {
   margin: 0 0 6px;
   font-size: 20px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: -0.3px;
+  position: relative;
+  z-index: 1;
 }
 
 .banner p {
@@ -21,38 +37,47 @@
   opacity: 0.92;
   font-size: 13px;
   line-height: 1.5;
+  letter-spacing: 0.3px;
+  position: relative;
+  z-index: 1;
 }
 
 .banner .coin {
   position: absolute;
   right: -10px;
   top: -14px;
-  font-size: 78px;
-  opacity: 0.22;
+  font-size: 90px;
+  opacity: 0.2;
   font-weight: 800;
   transform: rotate(12deg);
+  pointer-events: none;
 }
 
 .banner .cta {
-  margin-top: 12px;
-  min-height: 44px;
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.18);
-  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.22);
+  padding: 9px 16px;
   border-radius: 999px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
   color: #fff;
-  transition: transform 0.12s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease;
 }
 
 .banner .cta:active {
-  transform: scale(0.985);
-  opacity: 0.86;
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 /* Quick actions */
@@ -107,20 +132,25 @@
 /* Categories scroll row */
 .cats {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   overflow-x: auto;
-  padding: 4px 2px 10px;
+  padding: 6px 0 12px;
   -ms-overflow-style: none;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
 }
 
 .cats::-webkit-scrollbar { display: none; }
+
+.cats .chip {
+  scroll-snap-align: start;
+}
 
 /* Sort bar */
 .sortbar {
   display: flex;
   gap: 8px;
-  margin: 0 2px 10px;
+  margin: 0 0 14px;
   flex-wrap: wrap;
 }
 
@@ -865,4 +895,8 @@
   .wallet { padding: 10px 8px; }
   .wallet .n { font-size: 16px; }
   .wallet .l { font-size: 11px; }
+  /* 首页移动端微调 — 保持 16px 留白不变 */
+  .banner { min-height: 156px; padding: 16px 16px 14px; }
+  .banner h2 { font-size: 18px; }
+  .banner .cta { padding: 8px 14px; font-size: 12px; }
 }
