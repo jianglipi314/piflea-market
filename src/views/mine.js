@@ -457,7 +457,7 @@ export async function loadOrders(role) {
       return;
     }
 
-    const statusMap = { 'approved': '支付中', 'paid': '待发货', 'paid_pending_transfer': '待转账', 'shipped': '已发货', 'completed': '已完成' };
+    const statusMap = { 'pending': '处理中', 'approved': '支付中', 'paid': '待发货', 'paid_pending_transfer': '待转账', 'shipped': '已发货', 'completed': '已完成' };
 
     // 缓存订单数据，详情页使用
     cachedOrders[role] = orders;

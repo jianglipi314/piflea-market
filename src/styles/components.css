@@ -153,8 +153,15 @@
 .card .price {
   color: var(--brand);
   font-weight: 800;
-  font-size: 17px;
+  font-size: 18px;
   letter-spacing: -0.3px;
+}
+
+/* 元数据弱化：price-row 内右侧分类/包邮信息 */
+.card .price-row > div:last-child {
+  font-size: 11px;
+  color: var(--ink-2);
+  opacity: .75;
 }
 
 .card .price small {
@@ -171,7 +178,7 @@
   font-size: 12px;
   color: var(--ink-2);
   padding-top: 8px;
-  border-top: 1px solid var(--line);
+  border-top: none;
 }
 
 .card .seller span:not(.fav-count) {

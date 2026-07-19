@@ -142,6 +142,24 @@ export function confirmPayment() {
   const { total } = calcTotal(currentOrderItem);
 
   const piUser = getPiUser();
+
+  // 支付前校验 1：Pi 登录检查
+  if (!piUser || !piUser.uid) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    toast('\u8BF7\u5148\u767B\u5F55Pi\u8D26\u53F7');
+    return;
+  }
+
+  // 支付前校验 2：卖家身份检查（owner_id 必须存在，且不能是 seller_ fallback 前缀）
+  const sellerId = currentOrderItem.owner_id;
+  if (!sellerId || typeof sellerId !== 'string' || sellerId.startsWith('seller_')) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    toast('\u5546\u54C1\u5356\u5BB6\u4FE1\u606F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u53D1\u5E03\u5546\u54C1');
+    return;
+  }
+
   createPiPayment(
     total,
     'Piflea: ' + currentOrderItem.title,
@@ -159,14 +177,9 @@ export function confirmPayment() {
       btn.disabled = false;
       btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
       if (success && paymentId && txid) {
-        // Save order to database
-        createOrder(paymentId, txid).then(() => {
-          showPaymentSuccess(total);
-        }).catch(err => {
-          console.error('createOrder error:', err);
-          toast('订单创建失败，请联系客服');
-          showPaymentSuccess(total);
-        });
+        // 订单由后端 /api/approve + /api/complete 创建并更新状态
+        // 前端不再调用 /api/create-order，避免重复写入导致状态被覆盖为 pending
+        showPaymentSuccess(total);
       } else if (msg) {
         toast('\u652F\u4ED8\u5931\u8D25\uFF1A' + msg);
       }

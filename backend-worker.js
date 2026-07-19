@@ -235,7 +235,7 @@ async function handleApprove(request, env) {
     };
 
     if (existing) {
-      // 更新已有订单，补充缺失的字段
+      // 更新已有订单，补充缺失的字段（已有订单保持原逻辑，不做身份拦截）
       const updates = { status: 'approved', updated_at: new Date().toISOString() };
       if (!existing.buyer_id && orderData.buyer_id) updates.buyer_id = orderData.buyer_id;
       if (!existing.seller_id && orderData.seller_id) updates.seller_id = orderData.seller_id;
@@ -243,6 +243,36 @@ async function handleApprove(request, env) {
       if ((!existing.item_price || existing.item_price == 0) && orderData.item_price) updates.item_price = orderData.item_price;
       await updateOrder(paymentId, updates, env);
     } else {
+      // 新订单 INSERT 分支：身份字段强校验，防止空白订单
+      let finalBuyerId = body.buyerId || piMeta.buyerId;
+      let finalSellerId = body.sellerId || piMeta.sellerId;
+
+      // 二次兜底：身份仍为空时，再调一次 Pi Platform API 取 metadata
+      if (!finalBuyerId || !finalSellerId) {
+        try {
+          const retryPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
+          const retryMeta = retryPayment?.data?.metadata || {};
+          if (!finalBuyerId && retryMeta.buyerId) finalBuyerId = retryMeta.buyerId;
+          if (!finalSellerId && retryMeta.sellerId) finalSellerId = retryMeta.sellerId;
+        } catch (e) {
+          console.error('approve retry metadata fetch failed:', e.message);
+        }
+      }
+
+      if (!finalBuyerId || !finalSellerId) {
+        console.error('Missing buyer or seller identity', {
+          paymentId,
+          finalBuyerId,
+          finalSellerId,
+          body,
+          piMeta,
+        });
+        return errorResponse('Missing buyer or seller identity', 400, 'missing_identity', env);
+      }
+
+      // 强校验通过，回填 orderData 后再 INSERT
+      orderData.buyer_id = finalBuyerId;
+      orderData.seller_id = finalSellerId;
       await createOrder(orderData, env);
     }
 
@@ -287,11 +317,27 @@ async function handleComplete(request, env) {
     }
 
     // 更新订单状态为 paid（等待卖家发货）
-    await updateOrder(paymentId, {
+    const updates = {
       status: 'paid',
       txid,
       updated_at: new Date().toISOString(),
-    }, env);
+    };
+
+    // 身份补偿：若 buyer_id / seller_id 等字段为空，重新从 Pi Platform metadata 读取补写
+    if (!existing.buyer_id || !existing.seller_id || !existing.product_id || !existing.item_title) {
+      try {
+        const completePayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
+        const completeMeta = completePayment?.data?.metadata || {};
+        if (!existing.buyer_id && completeMeta.buyerId) updates.buyer_id = completeMeta.buyerId;
+        if (!existing.seller_id && completeMeta.sellerId) updates.seller_id = completeMeta.sellerId;
+        if (!existing.product_id && completeMeta.itemId) updates.product_id = completeMeta.itemId;
+        if (!existing.item_title && completeMeta.itemTitle) updates.item_title = completeMeta.itemTitle;
+      } catch (e) {
+        console.error('complete metadata fetch failed:', e.message);
+      }
+    }
+
+    await updateOrder(paymentId, updates, env);
 
     // 调用 Pi Platform API complete
     await piPlatformRequest(`/v2/payments/${paymentId}/complete`, 'POST', { txid }, env);
@@ -541,11 +587,24 @@ async function handleMarkShipped(request, env) {
   }
 }
 
-// 8. POST /api/create-order - 前端创建订单（已有，可保留兼容）
+// 8. POST /api/create-order - 前端创建订单（防御性去重：payment_id 已存在则直接返回）
 async function handleCreateOrder(request, env) {
   try {
     const body = await request.json();
     const { payment_id, txid, buyer_id, seller_id, item_id, item_title, item_price, amount, memo } = body;
+
+    // 去重保护：同一 payment_id 已有订单则直接返回，避免重复写入导致状态被覆盖
+    if (payment_id) {
+      const existing = await getOrderByPaymentId(payment_id, env);
+      if (existing) {
+        return jsonResponse({
+          success: true,
+          message: 'Order already exists',
+          order_id: existing.id,
+          status: existing.status,
+        }, 200, env);
+      }
+    }
 
     const orderData = {
       payment_id: payment_id || null,
