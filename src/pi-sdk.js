@@ -145,13 +145,16 @@ export async function authenticateWithPi() {
       console.log('[DEBUG Pi Auth] authResult keys:', Object.keys(authResult).join(', '));
       console.log('[DEBUG Pi Auth] accessToken length:', authResult.accessToken ? authResult.accessToken.length : 'not found');
       console.log('[DEBUG Pi Auth] user keys:', Object.keys(authResult.user).join(', '));
+      const cred = authResult.user.credentials;
+      const credKeys = cred ? Object.keys(cred) : [];
+      console.log('[DEBUG Pi Auth] credentials keys:', credKeys.join(', '));
       piUser = {
         uid: authResult.user.uid,
         username: authResult.user.username,
         accessToken: authResult.accessToken,
       };
       localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
-      toast('DEBUG: keys=' + Object.keys(authResult).join(',') + ' | tokenLen=' + (authResult.accessToken ? authResult.accessToken.length : 0) + ' | userKeys=' + Object.keys(authResult.user).join(','));
+      toast('DEBUG: credKeys=' + credKeys.join(',') + ' | credLen=' + (cred ? JSON.stringify(cred).length : 0));
       return piUser;
     }
     toast('登录失败：无用户数据');
