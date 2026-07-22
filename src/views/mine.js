@@ -449,6 +449,13 @@ export async function loadOrders(role) {
     const res = await apiFetch('/api/my-orders?uid=' + encodeURIComponent(user.uid) + '&role=' + role);
     const json = await res.json();
     orderLoader.style.display = 'none';
+
+    if (!res.ok || !json.success) {
+      orderEmpty.style.display = 'block';
+      orderEmpty.textContent = json.message || '加载失败，请重新登录';
+      return;
+    }
+
     const orders = json.data || [];
 
     if (orders.length === 0) {
