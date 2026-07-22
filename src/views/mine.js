@@ -329,7 +329,7 @@ export function applyPiUser() {
   const id = document.getElementById('m-id');
   if (nm) nm.textContent = '@' + username;
   if (av) av.textContent = (user.username || 'π').slice(0, 1).toUpperCase();
-  if (id) id.textContent = 'UID: ' + (user.uid || '').slice(0, 16);
+  if (id) id.textContent = 'UID: ' + (user.uid || '');
   // Reload items to reflect Pi UID ownership
   import('../views/home').then(mod => mod.loadItems());
   updatePiButtonState();
