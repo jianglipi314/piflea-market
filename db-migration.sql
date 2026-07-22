@@ -16,5 +16,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_items_status_category ON items(status, category);
 CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at DESC);
 
+-- 添加订单唯一编号字段
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_no TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_order_no ON orders(order_no);
+
 -- 刷新 schema cache（让 REST API 识别新列）
 NOTIFY pgrst, 'reload schema';

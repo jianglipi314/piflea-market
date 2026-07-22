@@ -480,7 +480,7 @@ export async function loadOrders(role) {
         '<div class="txt">' +
           '<h4>' + (o.item_title || '商品') + '</h4>' +
           '<div class="price">' + (o.item_price || o.amount || 0) + ' \u03c0</div>' +
-          '<div class="sub">' + (statusMap[o.status] || o.status) + ' \u00b7 ' + new Date(o.created_at).toLocaleDateString() + (o.status === 'shipped' && o.shipping_company ? ' \u00b7 ' + o.shipping_company : '') + '</div>' +
+          '<div class="sub">' + (o.order_no || '#' + o.id) + ' \u00b7 ' + (statusMap[o.status] || o.status) + ' \u00b7 ' + new Date(o.created_at).toLocaleDateString() + (o.status === 'shipped' && o.shipping_company ? ' \u00b7 ' + o.shipping_company : '') + '</div>' +
         '</div>' +
         '<div class="row-actions">' +
           (role === 'buyer' && o.status === 'shipped'
@@ -525,7 +525,7 @@ export function gotoOrderDetail(orderId) {
     '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
       '<div style="font-weight:700;font-size:14px;margin-bottom:10px">📋 订单状态</div>' +
       '<div style="font-size:16px;font-weight:700;color:var(--brand)">' + (statusMap[order.status] || order.status) + '</div>' +
-      '<div style="color:var(--ink-2);font-size:12px;margin-top:4px">订单号：' + (order.id) + '</div>' +
+      '<div style="color:var(--ink-2);font-size:12px;margin-top:4px">订单号：' + (order.order_no || '#' + order.id) + '</div>' +
       '<div style="color:var(--ink-2);font-size:12px">创建时间：' + new Date(order.created_at).toLocaleString() + '</div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +

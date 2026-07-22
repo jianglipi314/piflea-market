@@ -51,8 +51,7 @@ async function verifyPiToken(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   if (!token) {
-    console.log('[DEBUG my-orders] No token provided');
-    return null;
+    return { _debug: 'No token provided' };
   }
   const head = token.slice(0, 5);
   const tail = token.slice(-5);
@@ -65,15 +64,20 @@ async function verifyPiToken(request, env) {
     if (!res.ok) {
       const text = await res.text();
       console.log('[DEBUG my-orders] /v2/me failed, status:', res.status, 'body:', text);
-      return null;
+      return { _debug: 'v2/me status=' + res.status + ' body=' + text + ' | tokenLen=' + token.length + ' head=' + head + ' tail=' + tail };
     }
     const data = await res.json();
-    const user = data.user ? data.user : null;
+    console.log('[DEBUG my-orders] /v2/me success, full response:', JSON.stringify(data));
+    const user = data.user || data;
+    if (!user || !user.uid) {
+      console.error('Invalid Pi user response', data);
+      return null;
+    }
     console.log('[DEBUG my-orders] verifyPiToken result - uid:', user?.uid, 'username:', user?.username);
     return user;
   } catch (e) {
     console.error('Token verify failed:', e.message);
-    return null;
+    return { _debug: 'Exception: ' + e.message };
   }
 }
 
@@ -185,6 +189,19 @@ async function createOrder(data, env) {
   return supabaseRequest('/orders', 'POST', data, env);
 }
 
+function generateOrderNo() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let rand = '';
+  for (let i = 0; i < 6; i++) {
+    rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return 'PF' + y + m + d + rand;
+}
+
 async function updateOrder(paymentId, updates, env) {
   return supabaseRequest(
     `/orders?payment_id=eq.${encodeURIComponent(paymentId)}`,
@@ -232,6 +249,7 @@ async function handleApprove(request, env) {
     // 优先用前端传来的数据，后备用 Pi API metadata
     const orderData = {
       payment_id: paymentId,
+      order_no: generateOrderNo(),
       product_id: body.itemId || piMeta.itemId || piMeta.productId || null,
       buyer_id: body.buyerId || piMeta.buyerId || null,
       seller_id: body.sellerId || piMeta.sellerId || null,
@@ -937,8 +955,9 @@ export default {
       // 鉴权：需要 token 的路由
       if (AUTH_REQUIRED_ROUTES.includes(path)) {
         const piUser = await verifyPiToken(request, env);
-        if (!piUser) {
-          return errorResponse('Unauthorized - invalid or missing token', 401, 'unauthorized', env);
+        if (!piUser || piUser._debug) {
+          const debugMsg = piUser?._debug || 'null result';
+          return errorResponse('Unauthorized - invalid or missing token | DEBUG: ' + debugMsg, 401, 'unauthorized', env);
         }
         // 将验证后的用户信息附加到 request，供 handler 使用
         request.piUser = piUser;
