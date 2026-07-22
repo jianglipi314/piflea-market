@@ -606,10 +606,10 @@ export async function markShipped(orderId) {
   if (!user) { toast('请先登录'); return; }
 
   // 弹出发货弹窗
-  showShipModal(orderId);
+  showShipModal(orderId, user);
 }
 
-function showShipModal(orderId) {
+function showShipModal(orderId, user) {
   const old = document.getElementById('ship-modal');
   if (old) old.remove();
 
