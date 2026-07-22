@@ -451,8 +451,10 @@ export async function loadOrders(role) {
     orderLoader.style.display = 'none';
 
     if (!res.ok || !json.success) {
+      const hasToken = !!(user && user.accessToken);
+      const tokenLen = hasToken ? user.accessToken.length : 0;
       orderEmpty.style.display = 'block';
-      orderEmpty.textContent = json.message || '加载失败，请重新登录';
+      orderEmpty.textContent = json.message + ' | DEBUG: token存在=' + hasToken + ' 长度=' + tokenLen + ' uid=' + user.uid;
       return;
     }
 
