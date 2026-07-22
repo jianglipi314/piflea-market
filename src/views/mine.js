@@ -629,7 +629,7 @@ function showShipModal(orderId, user) {
       </div>
       <div style="margin-bottom:20px;">
         <label style="font-size:13px;color:var(--ink-2);display:block;margin-bottom:6px;">快递单号</label>
-        <input id="ship-tracking" type="text" placeholder="请输入快递单号（选填）" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;" />
+        <input id="ship-tracking" type="text" placeholder="请输入快递单号" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;" />
       </div>
       <div style="display:flex;gap:10px;">
         <button id="ship-cancel" style="flex:1;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:transparent;cursor:pointer;">取消</button>
