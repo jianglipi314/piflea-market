@@ -154,7 +154,7 @@ export async function authenticateWithPi() {
         accessToken: authResult.accessToken,
       };
       localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
-      toast('DEBUG: credKeys=' + credKeys.join(',') + ' | credLen=' + (cred ? JSON.stringify(cred).length : 0));
+      toast('DEBUG: valid_until=' + (cred?.valid_until || 'none') + ' | now=' + Date.now());
       return piUser;
     }
     toast('登录失败：无用户数据');
