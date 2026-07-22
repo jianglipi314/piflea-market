@@ -633,7 +633,7 @@ function showShipModal(orderId, user) {
       </div>
       <div style="display:flex;gap:10px;">
         <button id="ship-cancel" style="flex:1;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:transparent;cursor:pointer;">取消</button>
-        <button id="ship-confirm" style="flex:1;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;background:var(--primary);color:#fff;cursor:pointer;">确认发货</button>
+        <button id="ship-confirm" style="flex:1;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;background:var(--brand);color:#fff;cursor:pointer;">确认发货</button>
       </div>
     </div>
   `;
