@@ -142,13 +142,16 @@ export async function authenticateWithPi() {
       }
     );
     if (authResult && authResult.user) {
+      console.log('[DEBUG Pi Auth] authResult keys:', Object.keys(authResult).join(', '));
+      console.log('[DEBUG Pi Auth] accessToken length:', authResult.accessToken ? authResult.accessToken.length : 'not found');
+      console.log('[DEBUG Pi Auth] user keys:', Object.keys(authResult.user).join(', '));
       piUser = {
         uid: authResult.user.uid,
         username: authResult.user.username,
         accessToken: authResult.accessToken,
       };
       localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
-      toast('✅ 登录成功：@' + piUser.username);
+      toast('DEBUG: keys=' + Object.keys(authResult).join(',') + ' | tokenLen=' + (authResult.accessToken ? authResult.accessToken.length : 0) + ' | userKeys=' + Object.keys(authResult.user).join(','));
       return piUser;
     }
     toast('登录失败：无用户数据');
