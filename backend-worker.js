@@ -50,15 +50,27 @@ function errorResponse(message, status = 400, code = 'error', env) {
 async function verifyPiToken(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return null;
+  if (!token) {
+    console.log('[DEBUG my-orders] No token provided');
+    return null;
+  }
+  const head = token.slice(0, 5);
+  const tail = token.slice(-5);
+  console.log('[DEBUG my-orders] RECEIVE len=' + token.length + ' head=' + head + ' tail=' + tail);
 
   try {
     const res = await fetch(`${PLATFORM_API_URL}/v2/me`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const text = await res.text();
+      console.log('[DEBUG my-orders] /v2/me failed, status:', res.status, 'body:', text);
+      return null;
+    }
     const data = await res.json();
-    return data.user ? data.user : null;
+    const user = data.user ? data.user : null;
+    console.log('[DEBUG my-orders] verifyPiToken result - uid:', user?.uid, 'username:', user?.username);
+    return user;
   } catch (e) {
     console.error('Token verify failed:', e.message);
     return null;
@@ -498,12 +510,14 @@ async function handleIncomplete(request, env) {
 async function handleMyOrders(request, env) {
   try {
     const piUser = request.piUser;
+    console.log('[DEBUG my-orders] request.piUser:', JSON.stringify(piUser));
     if (!piUser) {
       return errorResponse('Authentication required', 401, 'unauthorized', env);
     }
     const uid = piUser.uid;
     const url = new URL(request.url);
     const role = url.searchParams.get('role') || 'all';
+    console.log('[DEBUG my-orders] uid:', uid, 'role:', role);
 
     if (!uid) return errorResponse('uid required', 400, 'missing_uid', env);
 
@@ -516,8 +530,10 @@ async function handleMyOrders(request, env) {
       query += `or=(buyer_id.eq.${encodeURIComponent(uid)},seller_id.eq.${encodeURIComponent(uid)})`;
     }
     query += '&order=created_at.desc&limit=50';
+    console.log('[DEBUG my-orders] Supabase query:', query);
 
     const orders = await supabaseRequest(query, 'GET', null, env);
+    console.log('[DEBUG my-orders] Supabase result count:', orders ? orders.length : 0);
 
     return jsonResponse({
       success: true,
