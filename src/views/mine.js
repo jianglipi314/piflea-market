@@ -516,10 +516,17 @@ export function gotoOrderDetail(orderId) {
   const otherLabel = isBuyer ? '卖家' : '买家';
   const otherUid = isBuyer ? (order.seller_uid || order.seller_id || '—') : (order.buyer_uid || order.buyer_id || '—');
 
+  // 通过 product_id 关联商品信息
+  const item = order.product_id ? state.items.find((it) => String(it.id) === String(order.product_id)) : null;
+  const itemImage = item?.images?.[0] || '';
+  const itemDesc = item?.description || '';
+
   const html =
     '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
       '<div style="font-weight:700;font-size:14px;margin-bottom:10px">📦 商品信息</div>' +
+      (itemImage ? '<div style="margin-bottom:10px"><img src="' + itemImage + '" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px" onerror="this.style.display=\'none\'"/></div>' : '') +
       '<div style="font-size:15px;font-weight:600">' + (order.item_title || '商品') + '</div>' +
+      (itemDesc ? '<div style="color:var(--ink-2);font-size:13px;margin-top:4px;line-height:1.5">' + escapeHtml(itemDesc) + '</div>' : '') +
       '<div style="color:var(--ink-2);font-size:13px;margin-top:4px">单价：' + (order.item_price || order.amount || 0) + ' π</div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
@@ -527,6 +534,7 @@ export function gotoOrderDetail(orderId) {
       '<div style="font-size:16px;font-weight:700;color:var(--brand)">' + (statusMap[order.status] || order.status) + '</div>' +
       '<div style="color:var(--ink-2);font-size:12px;margin-top:4px">订单号：' + (order.order_no || '#' + order.id) + '</div>' +
       '<div style="color:var(--ink-2);font-size:12px">创建时间：' + new Date(order.created_at).toLocaleString() + '</div>' +
+      (order.txid ? '<div style="color:var(--ink-2);font-size:12px;margin-top:4px">交易哈希：' + order.txid + '</div>' : '') +
     '</div>' +
     '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
       '<div style="font-weight:700;font-size:14px;margin-bottom:10px">💰 金额明细</div>' +
