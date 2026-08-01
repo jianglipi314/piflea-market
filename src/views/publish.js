@@ -153,6 +153,21 @@ let uploadImages = [];
 let formListenerBound = false;
 export function initFormListener() {
   if (formListenerBound) return;
+  // 返回按钮：回到来源页（编辑时回"我的发布"，发布时回首页）
+  const backBtn = document.getElementById('publish-back-btn');
+  if (backBtn && !backBtn._bound) {
+    backBtn._bound = true;
+    backBtn.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const target = state.publishReturnTo || 'home';
+      goto(target);
+      // 回到"我的"时恢复之前的 tab（如"我的发布"）
+      if (target === 'mine' && state.mineTab) {
+        import('./mine').then((mod) => mod.switchMine(state.mineTab));
+      }
+    });
+  }
   const submitBtn = document.getElementById('f-submit');
   if (submitBtn) {
     submitBtn.addEventListener('click', function(ev) {
@@ -511,6 +526,13 @@ export async function openEdit(id) {
     ? myIds.includes(it.owner_id)
     : false;
   if (!isMine) { toast('无权编辑此商品'); return; }
+
+  // 记录来源页（编辑通常从"我的发布"进入，返回时回到该页）
+  const activeView = document.querySelector('.view.active');
+  const fromView = activeView ? activeView.id.replace('view-', '') : 'home';
+  if (fromView !== 'publish') {
+    state.publishReturnTo = fromView;
+  }
 
   // Navigate first, then set editId (so goto can clear stale editId)
   goto('publish');

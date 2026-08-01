@@ -58,6 +58,12 @@ export function goto(name) {
     if (state.editId) {
       clearForm();
     }
+    // 记录发布页来源（openEdit 会覆盖为更准确的来源）
+    const cur = document.querySelector('.view.active');
+    const curName = cur ? cur.id.replace('view-', '') : 'home';
+    if (curName !== 'publish') {
+      state.publishReturnTo = curName;
+    }
   }
 
   // Toggle detail FAB
