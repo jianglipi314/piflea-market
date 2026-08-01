@@ -314,7 +314,44 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
                 itemPrice: metadata.itemPrice,
                 amount: metadata.amount,
               }),
-            }).then(r => r.json()).catch(e => {
+            }).then(r => {
+              // [DEBUG] approve response：记录日志 + 错误可见化（toast + debug）
+              // ⚠️ 仅显示错误，不调 failButton、不取消支付、不改 Pi SDK 状态机
+              return r.clone().text().then(rawText => {
+                let parsed = null;
+                try { parsed = JSON.parse(rawText); } catch (_) {}
+                const errCode = (parsed && (parsed.error_code || parsed.code)) || null;
+                const errMsg  = (parsed && (parsed.error_message || parsed.message)) || null;
+
+                console.log('[DEBUG] approve response', {
+                  paymentId,
+                  metadata,
+                  status: r.status,
+                  ok: r.ok,
+                  contentType: r.headers.get('content-type'),
+                  error_code: errCode,
+                  error_message: errMsg,
+                  body: parsed || rawText,
+                });
+
+                // ================= 手机可见化：出错时 toast + debug() 显示 =================
+                if (!r.ok) {
+                  const showCode = errCode ? `[${errCode}] ` : '';
+                  const showMsg  = errMsg || rawText || `HTTP ${r.status}`;
+                  const fullMsg  = `Approve错误: ${showCode}${showMsg}`;
+                  toast(fullMsg);
+                  debug(fullMsg, true);
+                }
+                // ====================================================================
+
+                // 完全恢复原始 then(r => r.json()) 行为
+                try {
+                  return parsed !== null ? parsed : JSON.parse(rawText);
+                } catch (_) {
+                  return rawText;
+                }
+              });
+            }).catch(e => {
               console.error('[DEBUG] approve err:', e);
               debug('approve err: ' + e, true);
             });
