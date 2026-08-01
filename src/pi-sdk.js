@@ -300,13 +300,16 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
       try {
         window.Pi.createPayment(paymentData, {
           onReadyForServerApproval: function (paymentId) {
-            console.log('[DEBUG] onReadyForServerApproval triggered! paymentId:', paymentId);
-            debug('onReadyForServerApproval: ' + paymentId);
+            const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
+            const network = isSandbox ? 'testnet' : 'mainnet';
+            console.log('[DEBUG] onReadyForServerApproval triggered! paymentId:', paymentId, 'network:', network);
+            debug('onReadyForServerApproval: ' + paymentId + ' (network: ' + network + ')');
             toast('支付等待确认');
             apiFetch('/api/approve', {
               method: 'POST',
               body: JSON.stringify({
                 paymentId,
+                network,
                 buyerId: metadata.buyerId,
                 sellerId: metadata.sellerId,
                 itemId: metadata.itemId,
@@ -357,12 +360,14 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
             });
           },
           onReadyForServerCompletion: function (paymentId, txid) {
-            console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid);
+            const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
+            const network = isSandbox ? 'testnet' : 'mainnet';
+            console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid, 'network:', network);
             debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
             toast('✅ 支付完成！正在创建订单...');
             apiFetch('/api/complete', {
               method: 'POST',
-              body: JSON.stringify({ paymentId, txid }),
+              body: JSON.stringify({ paymentId, txid, network }),
             }).then(r => r.json()).catch(e => {
               console.error('[DEBUG] complete err:', e);
               debug('complete err: ' + e, true);
