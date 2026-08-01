@@ -337,13 +337,15 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
                   body: parsed || rawText,
                 });
 
-                // ================= 手机可见化：出错时 toast + debug() 显示 =================
+                // ================= 手机可见化：出错时 toast + debug() 显示，并结束支付流程 =================
                 if (!r.ok) {
                   const showCode = errCode ? `[${errCode}] ` : '';
                   const showMsg  = errMsg || rawText || `HTTP ${r.status}`;
                   const fullMsg  = `Approve错误: ${showCode}${showMsg}`;
                   toast(fullMsg);
                   debug(fullMsg, true);
+                  // 🔴 错误时必须结束支付，否则永远转圈
+                  failButton(fullMsg);
                 }
                 // ====================================================================
 
@@ -356,7 +358,11 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
               });
             }).catch(e => {
               console.error('[DEBUG] approve err:', e);
-              debug('approve err: ' + e, true);
+              const fullMsg = 'Approve网络错误: ' + (e?.message || String(e));
+              debug(fullMsg, true);
+              // 🔴 catch 里也必须 toast + failButton，否则 CORS/网络错误时永远转圈
+              toast(fullMsg);
+              failButton(fullMsg);
             });
           },
           onReadyForServerCompletion: function (paymentId, txid) {
