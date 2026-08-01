@@ -104,6 +104,7 @@ export function initMineDelegation() {
       if (action === 'edit') openEdit(numId);
       else if (action === 'markSold') markSold(numId);
       else if (action === 'unsetSold') unsetSold(numId);
+      else if (action === 'deleteItem') deleteItem(numId);
       else if (action === 'openDetail') openDetail(numId);
     });
   }
@@ -235,6 +236,7 @@ export function switchMine(tab) {
                   ? `<button class="rm" data-action="unsetSold" data-id="${it.id}">恢复在售</button>`
                   : `<button class="edit-btn" data-action="markSold" data-id="${it.id}">标记已售</button>`
                 }
+                <button class="rm" data-action="deleteItem" data-id="${it.id}">删除</button>
               </div>
             </div>`
         )
@@ -415,6 +417,25 @@ export async function unsetSold(id) {
 }
 
 /**
+ * Delete an item permanently.
+ */
+export async function deleteItem(id) {
+  if (!confirm('确定删除该商品？\n删除后不可恢复，相关订单不受影响。')) return;
+  try {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('items').delete().eq('id', id);
+    if (error) throw error;
+    // 从本地 state 移除
+    const idx = state.items.findIndex((x) => x.id === id);
+    if (idx >= 0) state.items.splice(idx, 1);
+    toast('✅ 已删除');
+    switchMine('post');
+  } catch (e) {
+    toast('删除失败：' + e.message);
+  }
+}
+
+/**
  * Export app data.
  */
 
@@ -451,10 +472,8 @@ export async function loadOrders(role) {
     orderLoader.style.display = 'none';
 
     if (!res.ok || !json.success) {
-      const hasToken = !!(user && user.accessToken);
-      const tokenLen = hasToken ? user.accessToken.length : 0;
       orderEmpty.style.display = 'block';
-      orderEmpty.textContent = json.message + ' | DEBUG: token存在=' + hasToken + ' 长度=' + tokenLen + ' uid=' + user.uid;
+      orderEmpty.textContent = json.message || '加载订单失败';
       return;
     }
 

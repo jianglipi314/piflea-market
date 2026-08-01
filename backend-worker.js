@@ -13,11 +13,13 @@
 import { Keypair, Operation, Asset, TransactionBuilder, Memo, StrKey, Networks, Account } from '@stellar/stellar-base';
 
 // ============ 常量 ============
+// Pi Platform API 只有一个地址：api.minepi.com
+// 主网/测试网由 Developer Portal 注册 app 时的 App Network 决定，不影响 API URL
 const PLATFORM_API_URL = 'https://api.minepi.com';
-const PI_TESTNET_API_URL = 'https://api.testnet.minepi.com';
 
 function getPiApiUrl(network) {
-  return network === 'testnet' ? PI_TESTNET_API_URL : PLATFORM_API_URL;
+  // 无论主网还是测试网，Pi Platform API 地址都是 api.minepi.com
+  return PLATFORM_API_URL;
 }
 
 // Pi 链 Horizon 配置（来自 pi-nodejs 官方 .env.production）
@@ -238,18 +240,43 @@ async function handleApprove(request, env) {
 
     // =========================================================
     // [APPROVE_ERROR] 统一错误日志（所有 return errorResponse 前调用一次）
+    // 同时写入 Supabase orders 表，方便远程排查（Pi SDK 遮挡了前端 toast）
     // =========================================================
-    function debugApproveError(code, message, extra = {}) {
+    async function debugApproveError(code, message, extra = {}) {
       console.error('[APPROVE_ERROR]', JSON.stringify({
         time: new Date().toISOString(),
         code,
         message,
         ...extra,
       }));
+      // 写入数据库，status='approve_error'，item_title 记录错误码
+      try {
+        await supabaseRequest('/orders', 'POST', {
+          payment_id: extra.paymentId || ('debug_' + Date.now()),
+          order_no: 'ERR_' + Date.now(),
+          product_id: extra.productId || 0,
+          buyer_id: extra.finalBuyerId || null,
+          seller_id: extra.finalSellerId || null,
+          item_title: `[${code}] ${message}`.slice(0, 200),
+          item_price: 0,
+          shipping_fee: 0,
+          expected_amount: 0,
+          amount: 0,
+          memo: JSON.stringify(extra).slice(0, 500),
+          status: 'approve_error',
+          txid: null,
+          cancelled: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, env);
+        console.log('[APPROVE_ERROR] Written to Supabase orders table');
+      } catch (dbErr) {
+        console.error('[APPROVE_ERROR] Failed to write to Supabase:', dbErr.message);
+      }
     }
 
     if (!paymentId) {
-      debugApproveError('missing_payment_id', 'paymentId required', {
+      await debugApproveError('missing_payment_id', 'paymentId required', {
         body,
         body_keys: Object.keys(body || {}),
       });
@@ -267,7 +294,7 @@ async function handleApprove(request, env) {
         }, 200, env);
       }
       if (isCancelled(existing.status)) {
-        debugApproveError('already_cancelled', 'Payment already cancelled', {
+        await debugApproveError('already_cancelled', 'Payment already cancelled', {
           paymentId,
           existing_status: existing.status,
           existing_order_id: existing.id,
@@ -277,62 +304,44 @@ async function handleApprove(request, env) {
     }
 
     // 调用 Pi Platform API 验证支付真实性并获取详情
-    // 支持双网：前端传 network 参数或自动 fallback（主网 404 → 测试网）
+    // Pi Platform API 地址统一为 api.minepi.com，主网/测试网通用
     let payment;
-    const requestedNetwork = body.network || 'mainnet';
-    let usedNetwork = requestedNetwork;
     try {
-      payment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env, usedNetwork);
-      console.log('[APPROVE_NETWORK]', `Payment found on ${usedNetwork}`, { paymentId, usedNetwork });
+      payment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
+      console.log('[APPROVE_NETWORK]', `Payment verified via api.minepi.com`, { paymentId });
     } catch (e) {
-      const errMsg = e.message || '';
-      const is404 = errMsg.includes('404') || errMsg.includes('not_found') || errMsg.includes('Not Found');
-
-      // 如果主网找不到，自动 fallback 到测试网
-      if (usedNetwork === 'mainnet' && (is404 || requestedNetwork === 'auto')) {
-        console.log('[APPROVE_NETWORK_FALLBACK]', `Mainnet lookup failed, trying testnet`, { paymentId, reason: errMsg.slice(0, 200) });
-        usedNetwork = 'testnet';
-        try {
-          payment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env, usedNetwork);
-          console.log('[APPROVE_NETWORK]', `Payment found on ${usedNetwork} (fallback)`, { paymentId, usedNetwork });
-        } catch (e2) {
-          console.error('Pi API GET payment failed on both networks:', e2.message);
-          debugApproveError('payment_verification_failed', 'Failed to verify payment on both mainnet and testnet: ' + e2.message, {
-            paymentId,
-            error_message: e2.message,
-            error_stack: e2.stack ? e2.stack.slice(0, 500) : undefined,
-            mainnet_error: errMsg.slice(0, 300),
-          });
-          return errorResponse('Failed to verify payment: ' + e2.message, 400, 'payment_verification_failed', env);
-        }
-      } else {
-        console.error('Pi API GET payment failed:', e.message);
-        debugApproveError('payment_verification_failed', 'Failed to verify payment: ' + e.message, {
-          paymentId,
-          error_message: e.message,
-          error_stack: e.stack ? e.stack.slice(0, 500) : undefined,
-          network: usedNetwork,
-        });
-        return errorResponse('Failed to verify payment: ' + e.message, 400, 'payment_verification_failed', env);
-      }
+      console.error('Pi API GET payment failed:', e.message);
+      await debugApproveError('payment_verification_failed', 'Failed to verify payment: ' + e.message, {
+        paymentId,
+        error_message: e.message,
+        error_stack: e.stack ? e.stack.slice(0, 500) : undefined,
+      });
+      return errorResponse('Failed to verify payment: ' + e.message, 400, 'payment_verification_failed', env);
     }
 
-    const piData = payment?.data || {};
+    // Pi API 返回格式兼容：可能 { data: {...} } 或直接 {...}
+    const piData = payment?.data || payment || {};
     const piMeta = piData.metadata || {};
-    const piAmount = piData.amount?.value || 0;
+    const piAmount = piData.amount?.value ?? piData.amount ?? 0;
     const piMemo = piData.memo || '';
 
     // =========================================================
     // [PI_PAYMENT_DATA] Pi Platform 返回的真实支付对象 & metadata
     // =========================================================
     console.log('[PI_PAYMENT_DATA]', JSON.stringify({
+      payment_top_keys: payment ? Object.keys(payment) : null,
+      piData_keys: Object.keys(piData),
       identifier: piData.identifier,
       status: piData.status,
       amount: piData.amount,
+      amount_type: typeof piData.amount,
+      amount_keys: piData.amount ? Object.keys(piData.amount) : null,
+      piAmount_parsed: piAmount,
       memo: piMemo,
       metadata_keys: Object.keys(piMeta || {}),
       metadata: piMeta,
       userUid: piData.user?.uid,
+      full_payment: JSON.stringify(payment).slice(0, 1500),
     }));
 
     // ===== 资金安全校验：商品金额快照 =====
@@ -344,7 +353,7 @@ async function handleApprove(request, env) {
     // 1. product_id 必须存在
     if (!productId) {
       console.error('SECURITY: Missing product_id in payment metadata', { paymentId, piMeta });
-      debugApproveError('missing_product_id', 'Missing product_id', {
+      await debugApproveError('missing_product_id', 'Missing product_id', {
         paymentId,
         piMeta,
         body_itemId: body.itemId,
@@ -363,7 +372,7 @@ async function handleApprove(request, env) {
       );
       if (!items || !items.length) {
         console.error('SECURITY: Product not found', { paymentId, productId });
-        debugApproveError('product_not_found', 'Product not found', {
+        await debugApproveError('product_not_found', 'Product not found', {
           paymentId,
           productId,
           productId_type: typeof productId,
@@ -395,7 +404,7 @@ async function handleApprove(request, env) {
       }));
     } catch (e) {
       console.error('Failed to query product for verification:', e.message);
-      debugApproveError('price_verification_failed', 'Unable to verify product price', {
+      await debugApproveError('price_verification_failed', 'Unable to verify product price', {
         paymentId,
         productId,
         error_message: e.message,
@@ -407,7 +416,7 @@ async function handleApprove(request, env) {
     // 3. 验证商品状态
     if (item.status !== 'active') {
       console.error('SECURITY: Product unavailable', { paymentId, productId, status: item.status });
-      debugApproveError('product_unavailable', 'Product unavailable', {
+      await debugApproveError('product_unavailable', 'Product unavailable', {
         paymentId,
         productId,
         item_status: item.status,
@@ -423,7 +432,7 @@ async function handleApprove(request, env) {
         itemOwner: item.owner_id,
         metaSellerId: piMeta.sellerId,
       });
-      debugApproveError('seller_mismatch', 'Seller mismatch', {
+      await debugApproveError('seller_mismatch', 'Seller mismatch', {
         paymentId,
         productId,
         item_owner_id: item.owner_id,
@@ -442,10 +451,15 @@ async function handleApprove(request, env) {
     // 6. Pi amount 有效性检查（禁止 0 金额订单）
     if (!piAmount || piAmount <= 0) {
       console.error('SECURITY: Invalid payment amount', { paymentId, piAmount });
-      debugApproveError('invalid_amount', 'Invalid payment amount', {
+      await debugApproveError('invalid_amount', 'Invalid payment amount', {
         paymentId,
         piAmount,
         piAmount_type: typeof piAmount,
+        raw_amount: piData.amount,
+        raw_amount_type: typeof piData.amount,
+        raw_piData: JSON.stringify(piData).slice(0, 1000),
+        raw_payment: JSON.stringify(payment).slice(0, 1500),
+        payment_top_keys: payment ? Object.keys(payment) : null,
       });
       return errorResponse('Invalid payment amount', 400, 'invalid_amount', env);
     }
@@ -472,7 +486,7 @@ async function handleApprove(request, env) {
         shippingFee: shippingFeeSnapshot,
         productId,
       });
-      debugApproveError('amount_mismatch',
+      await debugApproveError('amount_mismatch',
         `Payment amount ${piAmount} does not match expected ${expectedAmount}`,
         {
           paymentId,
@@ -536,7 +550,7 @@ async function handleApprove(request, env) {
           body,
           piMeta,
         });
-        debugApproveError('missing_identity', 'Missing buyer or seller identity', {
+        await debugApproveError('missing_identity', 'Missing buyer or seller identity', {
           paymentId,
           finalBuyerId,
           finalSellerId,
@@ -556,9 +570,9 @@ async function handleApprove(request, env) {
       await createOrder(orderData, env);
     }
 
-    // 调用 Pi Platform API approve（使用验证时成功的网络）
+    // 调用 Pi Platform API approve
     try {
-      await piPlatformRequest(`/v2/payments/${paymentId}/approve`, 'POST', {}, env, usedNetwork);
+      await piPlatformRequest(`/v2/payments/${paymentId}/approve`, 'POST', {}, env);
     } catch (approveErr) {
       // Pi approve 失败，更新订单状态为 approve_failed，方便后续人工排查
       console.error('Pi approve failed after order creation', {
@@ -661,17 +675,10 @@ async function handleComplete(request, env) {
     // 先调用 Pi Platform API 获取支付详情，验证 paymentId 和 txid 关联关系
     let piPayment;
     try {
-      piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env, 'mainnet');
+      piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
     } catch (e) {
-      // 主网找不到，尝试测试网
-      console.log('[COMPLETE_NETWORK_FALLBACK]', 'Mainnet lookup failed, trying testnet', { paymentId, reason: e.message.slice(0, 200) });
-      try {
-        piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env, 'testnet');
-        console.log('[COMPLETE_NETWORK]', 'Payment found on testnet', { paymentId });
-      } catch (e2) {
-        console.error('Pi API GET payment failed in complete (both networks):', e2.message);
-        return errorResponse('Failed to verify payment: ' + e2.message, 400, 'payment_verification_failed', env);
-      }
+      console.error('Pi API GET payment failed in complete:', e.message);
+      return errorResponse('Failed to verify payment: ' + e.message, 400, 'payment_verification_failed', env);
     }
 
     const piTxid = piPayment?.data?.transaction?.txid
@@ -686,11 +693,7 @@ async function handleComplete(request, env) {
     }
 
     // 先调用 Pi Platform API complete，成功后再更新本地订单
-    await piPlatformRequest(`/v2/payments/${paymentId}/complete`, 'POST', { txid }, env, 'mainnet').catch(async (e) => {
-      // 主网 complete 失败，可能是测试网支付，尝试测试网
-      console.log('[COMPLETE_NETWORK_FALLBACK]', 'Mainnet complete failed, trying testnet', { paymentId, reason: e.message.slice(0, 200) });
-      return piPlatformRequest(`/v2/payments/${paymentId}/complete`, 'POST', { txid }, env, 'testnet');
-    });
+    await piPlatformRequest(`/v2/payments/${paymentId}/complete`, 'POST', { txid }, env);
 
     // 更新订单状态为 paid（等待卖家发货）
     const updates = {
@@ -804,24 +807,18 @@ async function handleIncomplete(request, env) {
       }
     }
 
-    // 安全修复：Horizon 失败时，用 Pi Platform API 二次确认（支持双网 fallback）
+    // 安全修复：Horizon 失败时，用 Pi Platform API 二次确认
     if (horizonFailed || !verifiedPaymentId) {
-      let piPayment;
       try {
-        piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env, 'mainnet');
-      } catch (e) {
-        console.log('[INCOMPLETE_NETWORK_FALLBACK]', 'Mainnet lookup failed, trying testnet', { paymentId });
-        try {
-          piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env, 'testnet');
-        } catch (e2) {
-          console.error('Pi Platform API fallback verification failed (both networks):', e2);
+        const piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
+        if (piPayment && piPayment.data && piPayment.data.status && piPayment.data.status.developer_approved) {
+          verifiedPaymentId = paymentId;
+          console.log('Pi Platform API fallback verification passed for', paymentId);
+        } else {
           return errorResponse('Payment verification failed', 400, 'verification_failed', env);
         }
-      }
-      if (piPayment && piPayment.data && piPayment.data.status && piPayment.data.status.developer_approved) {
-        verifiedPaymentId = paymentId; // Platform API 确认支付存在且已批准
-        console.log('Pi Platform API fallback verification passed for', paymentId);
-      } else {
+      } catch (e) {
+        console.error('Pi Platform API fallback verification failed:', e);
         return errorResponse('Payment verification failed', 400, 'verification_failed', env);
       }
     }
@@ -849,14 +846,9 @@ async function handleIncomplete(request, env) {
       }, env);
     }
 
-    // 调用 Pi Platform API complete（支持双网 fallback）
+    // 调用 Pi Platform API complete
     if (txid) {
-      try {
-        await piPlatformRequest(`/v2/payments/${paymentId}/complete`, 'POST', { txid }, env, 'mainnet');
-      } catch (e) {
-        console.log('[INCOMPLETE_NETWORK_FALLBACK]', 'Mainnet complete failed, trying testnet', { paymentId });
-        await piPlatformRequest(`/v2/payments/${paymentId}/complete`, 'POST', { txid }, env, 'testnet');
-      }
+      await piPlatformRequest(`/v2/payments/${paymentId}/complete`, 'POST', { txid }, env);
     }
 
     return jsonResponse({

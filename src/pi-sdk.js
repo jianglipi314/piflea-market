@@ -142,19 +142,12 @@ export async function authenticateWithPi() {
       }
     );
     if (authResult && authResult.user) {
-      console.log('[DEBUG Pi Auth] authResult keys:', Object.keys(authResult).join(', '));
-      console.log('[DEBUG Pi Auth] accessToken length:', authResult.accessToken ? authResult.accessToken.length : 'not found');
-      console.log('[DEBUG Pi Auth] user keys:', Object.keys(authResult.user).join(', '));
-      const cred = authResult.user.credentials;
-      const credKeys = cred ? Object.keys(cred) : [];
-      console.log('[DEBUG Pi Auth] credentials keys:', credKeys.join(', '));
       piUser = {
         uid: authResult.user.uid,
         username: authResult.user.username,
         accessToken: authResult.accessToken,
       };
       localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
-      toast('DEBUG: valid_until=' + JSON.stringify(cred?.valid_until) + ' | now=' + Date.now());
       return piUser;
     }
     toast('登录失败：无用户数据');
@@ -302,7 +295,6 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
           onReadyForServerApproval: function (paymentId) {
             const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
             const network = isSandbox ? 'testnet' : 'mainnet';
-            console.log('[DEBUG] onReadyForServerApproval triggered! paymentId:', paymentId, 'network:', network);
             debug('onReadyForServerApproval: ' + paymentId + ' (network: ' + network + ')');
             toast('支付等待确认');
             apiFetch('/api/approve', {
@@ -318,38 +310,22 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
                 amount: metadata.amount,
               }),
             }).then(r => {
-              // [DEBUG] approve response：记录日志 + 错误可见化（toast + debug）
-              // ⚠️ 仅显示错误，不调 failButton、不取消支付、不改 Pi SDK 状态机
+              // 错误时显示给用户并结束支付流程，避免永远转圈
               return r.clone().text().then(rawText => {
                 let parsed = null;
                 try { parsed = JSON.parse(rawText); } catch (_) {}
                 const errCode = (parsed && (parsed.error_code || parsed.code)) || null;
                 const errMsg  = (parsed && (parsed.error_message || parsed.message)) || null;
 
-                console.log('[DEBUG] approve response', {
-                  paymentId,
-                  metadata,
-                  status: r.status,
-                  ok: r.ok,
-                  contentType: r.headers.get('content-type'),
-                  error_code: errCode,
-                  error_message: errMsg,
-                  body: parsed || rawText,
-                });
-
-                // ================= 手机可见化：出错时 toast + debug() 显示，并结束支付流程 =================
                 if (!r.ok) {
                   const showCode = errCode ? `[${errCode}] ` : '';
                   const showMsg  = errMsg || rawText || `HTTP ${r.status}`;
-                  const fullMsg  = `Approve错误: ${showCode}${showMsg}`;
+                  const fullMsg  = `支付确认失败: ${showCode}${showMsg}`;
                   toast(fullMsg);
                   debug(fullMsg, true);
-                  // 🔴 错误时必须结束支付，否则永远转圈
                   failButton(fullMsg);
                 }
-                // ====================================================================
 
-                // 完全恢复原始 then(r => r.json()) 行为
                 try {
                   return parsed !== null ? parsed : JSON.parse(rawText);
                 } catch (_) {
@@ -357,10 +333,9 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
                 }
               });
             }).catch(e => {
-              console.error('[DEBUG] approve err:', e);
-              const fullMsg = 'Approve网络错误: ' + (e?.message || String(e));
+              console.error('approve err:', e);
+              const fullMsg = '支付确认网络错误: ' + (e?.message || String(e));
               debug(fullMsg, true);
-              // 🔴 catch 里也必须 toast + failButton，否则 CORS/网络错误时永远转圈
               toast(fullMsg);
               failButton(fullMsg);
             });
@@ -368,14 +343,13 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
           onReadyForServerCompletion: function (paymentId, txid) {
             const isSandbox = import.meta.env.VITE_PI_SANDBOX !== 'false';
             const network = isSandbox ? 'testnet' : 'mainnet';
-            console.log('[DEBUG] onReadyForServerCompletion triggered! paymentId:', paymentId, 'txid:', txid, 'network:', network);
             debug('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
             toast('✅ 支付完成！正在创建订单...');
             apiFetch('/api/complete', {
               method: 'POST',
               body: JSON.stringify({ paymentId, txid, network }),
             }).then(r => r.json()).catch(e => {
-              console.error('[DEBUG] complete err:', e);
+              console.error('complete err:', e);
               debug('complete err: ' + e, true);
             });
             resetButton(paymentId, txid);

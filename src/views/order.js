@@ -3,7 +3,7 @@ import { escapeHtml, fmtPrice, toast } from '../utils';
 import { createPiPayment, isPiAuthenticated, getPiUser } from '../pi-sdk';
 import { goto } from '../router';
 import { apiFetch, BACKEND_URL as BACKEND } from '../api';
-import { loadOrders } from './mine';
+import { loadOrders, switchMine } from './mine';
 
 const FEE_MODE = 'A';
 const NETWORK_FEE = 0;
@@ -224,22 +224,24 @@ function showPaymentSuccess(amount) {
 
   document.body.appendChild(modal);
 
-  // 点击按钮跳转到"我的"
+  // 点击按钮跳转到"我的"订单页
+  // 顺序很关键：必须先 goto('mine')（触发 renderMine 显示概览页），
+  // 再 switchMine('buy')（覆盖概览页，切换到订单 tab 并加载买家订单）。
+  // 不要再额外调用 loadOrders('seller')：它会覆盖买家订单列表（共用 orderList），
+  // 且与 switchMine 内部的 loadOrders('buyer') 存在异步竞态。
   const okBtn = modal.querySelector('#pay-success-btn');
   okBtn.addEventListener('click', function() {
     modal.remove();
-    loadOrders('buyer');
-    loadOrders('seller');
     goto('mine');
+    switchMine('buy');
   });
 
   // 点击遮罩也可以关闭
   modal.addEventListener('click', function(e) {
     if (e.target === modal) {
       modal.remove();
-      loadOrders('buyer');
-      loadOrders('seller');
       goto('mine');
+      switchMine('buy');
     }
   });
 }

@@ -42,6 +42,14 @@ export async function openDetail(id) {
   const it = state.items.find((x) => x.id === id);
   if (!it) { toast('商品不存在'); return; }
 
+  // 记录来源页，返回时回到该页（而非固定回首页）
+  const activeView = document.querySelector('.view.active');
+  const fromView = activeView ? activeView.id.replace('view-', '') : 'home';
+  // 排除详情页自身（防止重复进入时来源被覆盖成 detail）
+  if (fromView !== 'detail') {
+    state.detailReturnTo = fromView;
+  }
+
   // Bind action buttons (idempotent)
   initDetailButtons();
 
@@ -192,7 +200,12 @@ export async function openDetail(id) {
     backBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       e.preventDefault();
-      goto('home');
+      const target = state.detailReturnTo || 'home';
+      goto(target);
+      // 回到"我的"时，renderMine 会重置为概览页，需恢复之前的 tab（如"我的发布"）
+      if (target === 'mine' && state.mineTab && state.mineTab !== 'overview') {
+        import('../views/mine').then((mod) => mod.switchMine(state.mineTab));
+      }
     });
   }
 

@@ -31,6 +31,7 @@ import {
   exportData,
   markSold,
   unsetSold,
+  deleteItem,
   gotoOrderDetail,
   loadOrders,
   completeOrder,
@@ -182,6 +183,7 @@ window.piLogout = piLogout;
 window.exportData = exportData;
 window.markSold = markSold;
 window.unsetSold = unsetSold;
+window.deleteItem = deleteItem;
 window.isPiAuthenticated = isPiAuthenticated;
 window.getPiUser = getPiUser;
 window.loadOrders = loadOrders;
