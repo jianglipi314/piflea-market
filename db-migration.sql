@@ -20,5 +20,15 @@ CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at DESC);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_no TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_order_no ON orders(order_no);
 
+-- 添加 A2U 转账字段
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS a2u_payment_id TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS a2u_txid TEXT;
+CREATE INDEX IF NOT EXISTS idx_orders_a2u_txid ON orders(a2u_txid);
+CREATE INDEX IF NOT EXISTS idx_orders_a2u_payment_id ON orders(a2u_payment_id);
+
+-- 添加订单金额快照字段（资金安全）
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS expected_amount NUMERIC DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0;
+
 -- 刷新 schema cache（让 REST API 识别新列）
 NOTIFY pgrst, 'reload schema';
