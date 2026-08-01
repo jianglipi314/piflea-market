@@ -227,7 +227,7 @@ export function switchMine(tab) {
               <div class="txt">
                 <h4>${escapeHtml(it.title)} ${it.status === 'sold' ? '<span class="mini" style="color:#64748b">已售</span>' : '<span class="mini" style="color:var(--ok)">在售</span>'}</h4>
                 <div class="price">${fmtPrice(it.price)} π</div>
-                <div class="sub">👁 ${it.views || 0} 浏览</div>
+                <div class="sub">📂 ${it.category || ''} · 👁 ${it.views || 0} · ♥ ${it.fav_count || 0} · 📅 ${it.created_at ? new Date(it.created_at).toLocaleDateString() : ''}</div>
               </div>
               <div class="row-actions">
                 <button class="edit-btn" data-action="edit" data-id="${it.id}">编辑</button>
