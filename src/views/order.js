@@ -160,6 +160,34 @@ export function confirmPayment() {
     return;
   }
 
+  // 支付前校验 3：收货信息检查（姓名/手机/地址 必填，备注选填）
+  const receiverName = (document.getElementById('o-receiver-name')?.value || '').trim();
+  const receiverPhone = (document.getElementById('o-receiver-phone')?.value || '').trim();
+  const receiverAddress = (document.getElementById('o-receiver-address')?.value || '').trim();
+  const buyerNote = (document.getElementById('o-buyer-note')?.value || '').trim();
+
+  if (!receiverName) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    toast('\u8BF7\u586B\u5199\u6536\u8D27\u4EBA\u59D3\u540D');
+    document.getElementById('o-receiver-name')?.focus();
+    return;
+  }
+  if (!receiverPhone) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    toast('\u8BF7\u586B\u5199\u6536\u8D27\u4EBA\u624B\u673A\u53F7');
+    document.getElementById('o-receiver-phone')?.focus();
+    return;
+  }
+  if (!receiverAddress) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    toast('\u8BF7\u586B\u5199\u6536\u8D27\u5730\u5740');
+    document.getElementById('o-receiver-address')?.focus();
+    return;
+  }
+
   createPiPayment(
     total,
     'Piflea: ' + currentOrderItem.title,
@@ -172,6 +200,11 @@ export function confirmPayment() {
       mode: FEE_MODE,
       buyerId: piUser ? piUser.uid : null,
       sellerId: currentOrderItem.owner_id || null,
+      // 收货信息（通过 Pi metadata 透传到 backend handleApprove）
+      receiverName,
+      receiverPhone,
+      receiverAddress,
+      buyerNote,
     },
     function(success, msg, paymentId, txid) {
       btn.disabled = false;

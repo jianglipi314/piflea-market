@@ -522,6 +522,11 @@ async function handleApprove(request, env) {
       expected_amount: expectedAmount,
       amount: piAmount,
       memo: piMemo || body.memo || '',
+      // 收货信息（从 Pi payment metadata 读取，前端通过 createPiPayment 传入）
+      receiver_name: piMeta.receiverName || body.receiverName || null,
+      receiver_phone: piMeta.receiverPhone || body.receiverPhone || null,
+      receiver_address: piMeta.receiverAddress || body.receiverAddress || null,
+      buyer_note: piMeta.buyerNote || body.buyerNote || null,
       status: 'pending_approve',
       txid: null,
       cancelled: false,
@@ -972,7 +977,8 @@ async function handleMarkShipped(request, env) {
 async function handleCreateOrder(request, env) {
   try {
     const body = await request.json();
-    const { payment_id, txid, buyer_id, seller_id, item_id, item_title, item_price, amount, memo } = body;
+    const { payment_id, txid, buyer_id, seller_id, item_id, item_title, item_price, amount, memo,
+            receiverName, receiverPhone, receiverAddress, buyerNote } = body;
 
     // 去重保护：同一 payment_id 已有订单则直接返回，避免重复写入导致状态被覆盖
     if (payment_id) {
@@ -996,6 +1002,11 @@ async function handleCreateOrder(request, env) {
       item_price: item_price || 0,
       amount: amount || 0,
       memo: memo || '',
+      // 收货信息（兼容字段，前端当前不调用此接口）
+      receiver_name: receiverName || null,
+      receiver_phone: receiverPhone || null,
+      receiver_address: receiverAddress || null,
+      buyer_note: buyerNote || null,
       status: 'pending',
       txid: txid || null,
       cancelled: false,

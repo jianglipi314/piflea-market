@@ -308,6 +308,11 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
                 itemTitle: metadata.itemTitle,
                 itemPrice: metadata.itemPrice,
                 amount: metadata.amount,
+                // 收货信息（同时通过 body 传递，作为 Pi metadata 的备份）
+                receiverName: metadata.receiverName,
+                receiverPhone: metadata.receiverPhone,
+                receiverAddress: metadata.receiverAddress,
+                buyerNote: metadata.buyerNote,
               }),
             }).then(r => {
               // 错误时显示给用户并结束支付流程，避免永远转圈
