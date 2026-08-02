@@ -116,18 +116,21 @@
       <button class="icon-btn" id="detail-back-btn" style="position:absolute;top:14px;left:14px;min-width:48px;width:48px;height:48px;font-size:32px;z-index:20">‹</button>
       <span id="d-emoji">📦</span>
       <div class="gallery-dots" id="d-dots"></div>
+      <div class="gallery-count" id="d-count"></div>
     </div>
     <div class="detail-card">
       <h2 class="title" id="d-title">—</h2>
-      <div class="price"><span id="d-price">0</span> <small style="font-weight:500">π</small></div>
+      <div class="price-line">
+        <div class="price"><span class="pi-ico">π</span><span id="d-price">0</span></div>
+        <div class="status-tag" id="d-status-tag">在售</div>
+      </div>
       <div class="meta-row" id="d-meta"></div>
       <div class="seller-row">
         <div class="avatar" id="d-avatar">?</div>
         <div class="t">
           <div class="name" id="d-seller">—</div>
-          <div class="sub" id="d-seller-sub">注册卖家</div>
+          <div class="sub" id="d-seller-sub">Pi 认证卖家</div>
         </div>
-        <div class="right" id="d-loc">—</div>
       </div>
       <div class="seller-row" id="d-contact-row" style="display:none">
         <div class="avatar" style="background:var(--brand);color:#fff">📞</div>
@@ -140,12 +143,12 @@
     </div>
     <div class="desc" id="d-desc">—</div>
     <div class="action-row">
-      <button class="btn ghost" id="d-chat-btn">💬 联系卖家</button>
       <button class="btn ghost" id="d-share-btn">⇪ 分享</button>
       <button class="btn ghost" id="d-report-btn">⚠ 举报</button>
     </div>
     <div class="detail-fab" id="d-fab">
-      <button class="btn primary" id="d-buy-btn">立即购买</button>
+      <button class="btn ghost" id="d-chat-btn">💬 联系卖家</button>
+      <button class="btn primary" id="d-buy-btn">π 立即购买</button>
     </div>
   </section>
 

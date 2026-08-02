@@ -501,6 +501,23 @@
   background: #fff;
 }
 
+/* 图片计数（右上角，如 2/5） */
+.gallery-count {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 15;
+  display: none;
+}
+
 .detail-card {
   background: var(--card);
   border-radius: var(--radius);
@@ -516,10 +533,42 @@
   margin: 0 0 6px;
 }
 
+/* 价格行：π前缀价格 + 状态标签 */
+.detail-card .price-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .detail-card .price {
   color: var(--brand);
   font-size: 22px;
   font-weight: 800;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.detail-card .price .pi-ico {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--brand);
+  margin-right: 1px;
+}
+
+/* 状态标签 */
+.detail-card .status-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ok);
+  background: rgba(34, 197, 94, 0.1);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.detail-card .status-tag.sold {
+  color: #fff;
+  background: #64748b;
 }
 
 .meta-row {
@@ -556,7 +605,6 @@
 .seller-row .name { font-weight: 600; }
 .seller-row .sub { font-size: 12px; color: var(--ink-2); }
 .seller-row .t { flex: 1; min-width: 0; }
-.seller-row .right { margin-left: auto; font-size: 12px; color: var(--ink-2); }
 
 .desc {
   background: var(--card);

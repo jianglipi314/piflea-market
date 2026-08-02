@@ -87,9 +87,17 @@ export async function openDetail(id) {
   document.getElementById('d-seller').textContent = it.seller || '卖家';
   document.getElementById('d-avatar').textContent = (it.seller || 'U').slice(0, 1);
   document.getElementById('d-emoji').textContent = it.emoji || '📦';
-  document.getElementById('d-loc').textContent = it.city || '—';
-  document.getElementById('d-seller-sub').textContent =
-    (it.shipping_fee > 0 ? '运费 ' + fmtPrice(it.shipping_fee) + ' π · ' : '包邮 · ') + '👁 ' + (it.views || 0) + ' 次浏览';
+  document.getElementById('d-seller-sub').textContent = 'Pi 认证卖家';
+
+  // 状态标签
+  const statusTag = document.getElementById('d-status-tag');
+  if (it.status === 'sold') {
+    statusTag.textContent = '🏁 已售';
+    statusTag.className = 'status-tag sold';
+  } else {
+    statusTag.textContent = '✓ 在售';
+    statusTag.className = 'status-tag';
+  }
 
   // Contact info
   const contactRow = document.getElementById('d-contact-row');
@@ -115,17 +123,18 @@ export async function openDetail(id) {
     contactRow.style.display = 'none';
   }
 
-  // Meta tags
-  const statusTag = it.status === 'sold'
-    ? '<span style="background:#64748b;color:#fff">🏁 已售</span>'
-    : '<span style="color:var(--ok)">在售</span>';
-  document.getElementById('d-meta').innerHTML = [
-    `<span>🏷 ${it.cat}</span>`,
-    statusTag,
-    `<span>👁 ${it.views || 0} 浏览</span>`,
-    `<span>🕓 ${timeAgo(it.createdAt)}</span>`,
-    `<span>#${it.id}</span>`,
-  ].join('');
+  // Meta tags：城市/浏览/收藏/时间/分类（移除商品ID）
+  const metaParts = [];
+  if (it.city) metaParts.push(`<span>📍 ${escapeHtml(it.city)}</span>`);
+  metaParts.push(`<span>👁 ${it.views || 0}</span>`);
+  if (it.fav_count && it.fav_count > 0) metaParts.push(`<span>❤️ ${it.fav_count}</span>`);
+  // 修复：created_at（蛇形）而非 createdAt（驼峰）
+  if (it.created_at) {
+    const ts = new Date(it.created_at).getTime();
+    if (!isNaN(ts)) metaParts.push(`<span>🕒 ${timeAgo(ts)}</span>`);
+  }
+  if (it.cat) metaParts.push(`<span>🏷 ${escapeHtml(it.cat)}</span>`);
+  document.getElementById('d-meta').innerHTML = metaParts.join('');
 
   // Gallery
   heroImgIdx = 0;
@@ -172,6 +181,18 @@ export async function openDetail(id) {
       ? it.images.map((_, i) => `<span class="${i === 0 ? 'on' : ''}"></span>`).join('')
       : '';
 
+  // 图片计数显示（如 2/5），无图时隐藏
+  const countEl = document.getElementById('d-count');
+  if (countEl) {
+    if (it.images && it.images.length > 1) {
+      countEl.style.display = '';
+      countEl.textContent = '1/' + it.images.length;
+    } else {
+      countEl.style.display = 'none';
+      countEl.textContent = '';
+    }
+  }
+
   // Update dots on scroll
   gallery.onscroll = () => {
     const idx = Math.round(gallery.scrollLeft / gallery.offsetWidth);
@@ -180,6 +201,10 @@ export async function openDetail(id) {
       dots.querySelectorAll('span').forEach((s, i) =>
         s.classList.toggle('on', i === heroImgIdx)
       );
+      // 同步更新计数
+      if (countEl && it.images && it.images.length) {
+        countEl.textContent = (heroImgIdx + 1) + '/' + it.images.length;
+      }
     }
   };
 
@@ -227,7 +252,7 @@ export async function openDetail(id) {
     buyBtn.disabled = true;
     buyBtn.style.opacity = '0.6';
   } else {
-    buyBtn.textContent = '立即购买';
+    buyBtn.textContent = 'π 立即购买';
     buyBtn.disabled = false;
     buyBtn.style.opacity = '1';
   }
