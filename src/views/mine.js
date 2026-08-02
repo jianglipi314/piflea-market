@@ -76,15 +76,45 @@ export function renderMine() {
     if (nm) nm.textContent = '@' + user.username;
   }
 
-  // Counts
-  const myIds = getAllMyUserIds();
-  const myItems = state.items.filter(
-    (it) =>
-      (it.owner_id && myIds.includes(it.owner_id))
-  );
+  // 统计卡点击：跳转对应 tab（幂等绑定）
+  const statsCard = document.getElementById('mine-stats');
+  if (statsCard && !statsCard._bound) {
+    statsCard._bound = true;
+    statsCard.addEventListener('click', function(e) {
+      const cell = e.target.closest('[data-stat]');
+      if (!cell) return;
+      const stat = cell.dataset.stat;
+      if (stat === 'post') switchMine('post');
+      else if (stat === 'buy') switchMine('buy');
+      else if (stat === 'sell') switchMine('sell');
+    });
+  }
 
   // 默认显示概览页（不直接进入任何 tab）
   showMineOverview();
+}
+
+/**
+ * 更新"我的"页面交易统计卡。
+ * 发布商品：state.items 中属于当前用户的数量
+ * 已购买：cachedOrders.buyer 长度（访问购买 tab 后缓存）
+ * 已出售：cachedOrders.seller 长度（访问出售 tab 后缓存）
+ * 暂无数据时显示 0。
+ */
+export function updateMineStats() {
+  const postedEl = document.getElementById('stat-posted');
+  const boughtEl = document.getElementById('stat-bought');
+  const soldEl = document.getElementById('stat-sold');
+  if (!postedEl) return;
+
+  const myIds = getAllMyUserIds();
+  const posted = state.items.filter((it) => it.owner_id && myIds.includes(it.owner_id)).length;
+  const bought = (cachedOrders.buyer || []).length;
+  const sold = (cachedOrders.seller || []).length;
+
+  postedEl.textContent = posted;
+  boughtEl.textContent = bought;
+  soldEl.textContent = sold;
 }
 
 /**
@@ -143,15 +173,18 @@ export function showMineOverview() {
   // 显示概览元素
   const backBar = document.getElementById('mine-back-bar');
   const profile = document.getElementById('mine-profile');
-  const wallet = document.getElementById('mine-wallet');
+  const stats = document.getElementById('mine-stats');
   const tabs = document.getElementById('mine-tabs');
   const setting = document.querySelector('#view-mine .setting');
 
   if (backBar) backBar.style.display = 'none';
   if (profile) profile.style.display = '';
-  if (wallet) wallet.style.display = '';
+  if (stats) stats.style.display = '';
   if (tabs) tabs.style.display = '';
   if (setting) setting.style.display = '';
+
+  // 概览页刷新交易统计
+  updateMineStats();
 }
 
 /**
@@ -170,14 +203,14 @@ export function switchMine(tab) {
   // 所有 tab 都进入子页面模式：隐藏概览信息，显示返回栏
   const backBar = document.getElementById('mine-back-bar');
   const profile = document.getElementById('mine-profile');
-  const wallet = document.getElementById('mine-wallet');
+  const stats = document.getElementById('mine-stats');
   const tabs = document.getElementById('mine-tabs');
   const setting = document.querySelector('#view-mine .setting');
   const backTitle = document.getElementById('mine-back-title');
 
   if (backBar) backBar.style.display = 'flex';
   if (profile) profile.style.display = 'none';
-  if (wallet) wallet.style.display = 'none';
+  if (stats) stats.style.display = 'none';
   if (tabs) tabs.style.display = 'none';
   if (setting) setting.style.display = 'none';
   if (backTitle) {
@@ -412,6 +445,7 @@ export async function markSold(id) {
     const it = state.items.find(x => x.id === id);
     if (it) it.status = 'sold';
     toast('✅ 已标记为已售');
+    updateMineStats();
     switchMine('post');
   } catch (e) {
     toast('操作失败：' + e.message);
@@ -429,6 +463,7 @@ export async function unsetSold(id) {
     const it = state.items.find(x => x.id === id);
     if (it) it.status = 'active';
     toast('✅ 已恢复在售');
+    updateMineStats();
     switchMine('post');
   } catch (e) {
     toast('操作失败：' + e.message);
@@ -448,6 +483,7 @@ export async function deleteItem(id) {
     const idx = state.items.findIndex((x) => x.id === id);
     if (idx >= 0) state.items.splice(idx, 1);
     toast('✅ 已删除');
+    updateMineStats();
     switchMine('post');
   } catch (e) {
     toast('删除失败：' + e.message);
@@ -508,6 +544,8 @@ export async function loadOrders(role) {
 
     // 缓存订单数据，详情页使用
     cachedOrders[role] = orders;
+    // 订单缓存更新后刷新交易统计
+    updateMineStats();
 
     orderList.innerHTML = orders.map(function(o) {
       console.log('[renderOrders] orderId=', o.id, 'title=', o.item_title);
