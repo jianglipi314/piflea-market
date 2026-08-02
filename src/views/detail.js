@@ -5,6 +5,8 @@ import { HIST_KEY } from '../state';
 import { escapeHtml, fmtPrice, timeAgo, fallbackCopy, toast, getAllMyUserIds, getCurrentUserId } from '../utils';
 import { openSheet } from '../components/sheet';
 import { getSupabase } from '../supabase';
+import { apiFetch } from '../api';
+import { getPiUser } from '../pi-sdk';
 
 let heroImgIdx = 0;
 
@@ -32,6 +34,81 @@ export function initDetailButtons() {
   if (buyBtn && !buyBtn._bound) {
     buyBtn._bound = true;
     buyBtn.addEventListener('click', fakeBuy);
+  }
+  const favBtn = document.getElementById('d-fav-btn');
+  if (favBtn && !favBtn._bound) {
+    favBtn._bound = true;
+    favBtn.addEventListener('click', toggleFavorite);
+  }
+}
+
+// ============ 收藏逻辑 ============
+// 收藏态从后端 /api/favorite-check 获取，不维护本地缓存
+// 已下架商品仍保留收藏关系，不隐藏按钮
+
+function setFavBtnState(favorited) {
+  const btn = document.getElementById('d-fav-btn');
+  if (!btn) return;
+  if (favorited) {
+    btn.textContent = '❤️ 已收藏';
+    btn.classList.add('on');
+    btn.dataset.fav = '1';
+  } else {
+    btn.textContent = '🤍 收藏';
+    btn.classList.remove('on');
+    btn.dataset.fav = '0';
+  }
+}
+
+async function loadFavState(itemId) {
+  // 未登录直接显示未收藏态（按钮可见，点击时引导登录）
+  if (!getPiUser()) {
+    setFavBtnState(false);
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/favorite-check?itemId=' + encodeURIComponent(itemId));
+    const data = await res.json();
+    if (res.ok && data.success) {
+      setFavBtnState(!!data.data?.favorited);
+    } else {
+      setFavBtnState(false);
+    }
+  } catch (e) {
+    console.error('favorite-check err:', e);
+    setFavBtnState(false);
+  }
+}
+
+async function toggleFavorite() {
+  const id = state.currentDetailId;
+  if (!id) return;
+  if (!getPiUser()) {
+    toast('请先登录 Pi 账号');
+    return;
+  }
+  const btn = document.getElementById('d-fav-btn');
+  const isFav = btn && btn.dataset.fav === '1';
+  // 乐观更新：立即切换 UI，失败回滚
+  setFavBtnState(!isFav);
+  try {
+    const path = isFav ? '/api/unfavorite' : '/api/favorite';
+    const res = await apiFetch(path, {
+      method: 'POST',
+      body: JSON.stringify({ itemId: id }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      setFavBtnState(!!data.data?.favorited);
+      toast(isFav ? '已取消收藏' : '已收藏');
+    } else {
+      // 回滚
+      setFavBtnState(isFav);
+      toast(data.error || '操作失败');
+    }
+  } catch (e) {
+    setFavBtnState(isFav);
+    toast('网络错误：' + (e?.message || e));
   }
 }
 
@@ -257,6 +334,8 @@ export async function openDetail(id) {
     buyBtn.style.opacity = '1';
   }
   document.getElementById('d-fab').style.display = 'flex';
+  // 加载收藏态（异步，不阻塞渲染）
+  loadFavState(id);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 

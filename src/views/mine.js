@@ -3,7 +3,7 @@
 import { state } from '../main';
 import { HIST_KEY, DARK_KEY } from '../state';
 import { escapeHtml, fmtPrice, toast, getOwnerId, getAllMyUserIds, getPiUid } from '../utils';
-import { getSupabase } from '../supabase';
+import { getSupabase, decodeItem } from '../supabase';
 import { authenticateWithPi, logoutPi, isPiAuthenticated, getPiUser, createPiPayment } from '../pi-sdk';
 import { goto } from '../router';
 import { openEdit } from './publish';
@@ -12,7 +12,7 @@ import { apiFetch, BACKEND_URL as BACKEND } from '../api';
 
 // 用 addEventListener 绑定 tab 按钮（Pi Browser 不支持内联 onclick）
 function initTabListeners() {
-  const tabMap = { 'tab-post': 'post', 'tab-buy': 'buy', 'tab-sell': 'sell', 'tab-hist': 'hist' };
+  const tabMap = { 'tab-post': 'post', 'tab-buy': 'buy', 'tab-sell': 'sell', 'tab-fav': 'fav', 'tab-hist': 'hist' };
   Object.keys(tabMap).forEach(function(id) {
     const el = document.getElementById(id);
     if (el) {
@@ -214,7 +214,7 @@ export function switchMine(tab) {
   if (tabs) tabs.style.display = 'none';
   if (setting) setting.style.display = 'none';
   if (backTitle) {
-    const titleMap = { post: '我的发布', buy: '我的购买', sell: '我的出售', hist: '浏览记录' };
+    const titleMap = { post: '我的发布', buy: '我的购买', sell: '我的出售', fav: '我的收藏', hist: '浏览记录' };
     backTitle.textContent = titleMap[tab] || '我的';
   }
 
@@ -279,6 +279,9 @@ export function switchMine(tab) {
       empty.style.display = 'block';
       empty.textContent = '还没有发布过商品，快去发布一件吧～';
     }
+  } else if (tab === 'fav') {
+    // 我的收藏：从后端 /api/favorites 拉取（需 Pi 登录）
+    loadFavorites(list, empty);
   } else if (tab === 'hist') {
     const viewed = state.history
       .map((h) => state.items.find((it) => it.id === h.id))
@@ -307,6 +310,66 @@ export function switchMine(tab) {
       empty.style.display = 'block';
       empty.textContent = '还没有浏览记录～';
     }
+  }
+}
+
+/**
+ * 加载我的收藏列表（从后端 /api/favorites 拉取，需 Pi 登录）。
+ * 后端返回 items 原始行，直接渲染。
+ */
+async function loadFavorites(list, empty) {
+  if (!getPiUser()) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    empty.textContent = '请先登录 Pi 账号后查看收藏～';
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/favorites');
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      empty.textContent = data.error || '加载收藏失败';
+      return;
+    }
+    const items = data.data || [];
+    if (!items.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      empty.textContent = '还没有收藏商品，去逛逛吧～';
+      return;
+    }
+    empty.style.display = 'none';
+    // decode 后注入 state.items（去重），保证 openDetail 能找到商品
+    const decoded = items.map((raw) => decodeItem(raw));
+    decoded.forEach((it) => {
+      if (it && !state.items.find((x) => String(x.id) === String(it.id))) {
+        state.items.push(it);
+      }
+    });
+    list.innerHTML = decoded
+      .map((it) => {
+        const img = it.images && it.images[0]
+          ? `<img src="${it.images[0]}" loading="lazy" decoding="async" onerror="this.style.display='none'"/>`
+          : (it.emoji || '📦');
+        const statusBadge = it.status === 'sold'
+          ? '<span class="mini" style="color:#64748b">已售</span>'
+          : '<span class="mini" style="color:var(--ok)">在售</span>';
+        return `<div class="row-item" data-action="openDetail" data-id="${it.id}">
+          <div class="pic">${img}</div>
+          <div class="txt">
+            <h4>${escapeHtml(it.title || '')} ${statusBadge}</h4>
+            <div class="price">${fmtPrice(it.price)} π</div>
+            <div class="sub">📂 ${it.cat || ''} · 👁 ${it.views || 0} · 📅 ${it.createdAt ? new Date(it.createdAt).toLocaleDateString() : ''}</div>
+          </div>
+        </div>`;
+      })
+      .join('');
+  } catch (e) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    empty.textContent = '网络错误：' + (e?.message || e);
   }
 }
 

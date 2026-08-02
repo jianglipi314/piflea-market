@@ -95,6 +95,11 @@ const AUTH_REQUIRED_ROUTES = [
   '/api/my-orders',
   '/api/complete-order',
   '/api/create-order',
+  // 收藏 API：身份从 Authorization Bearer token 获取，禁止前端传 userUid
+  '/api/favorite',
+  '/api/unfavorite',
+  '/api/favorites',
+  '/api/favorite-check',
 ];
 
 // 管理员 UID 白名单
@@ -907,6 +912,147 @@ async function handleMyOrders(request, env) {
   }
 }
 
+// ============ 收藏 API ============
+// 身份来源：Authorization Bearer token → verifyPiToken → request.piUser.uid
+// 禁止前端传 userUid，统一从 request.piUser 取
+// 收藏真实数据只来自 favorites 表，不维护 items.fav_count
+
+// 5.1 POST /api/favorite - 收藏商品（幂等，UNIQUE 约束兜底）
+async function handleFavorite(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const uid = piUser.uid;
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return jsonResponse({ success: false, error: 'itemId required' }, 400, env);
+    }
+
+    // 校验商品存在（不限制 status，已下架也可保留收藏关系）
+    const items = await supabaseRequest(
+      `/items?id=eq.${encodeURIComponent(itemId)}&select=id&limit=1`,
+      'GET', null, env
+    );
+    if (!items || !items.length) {
+      return jsonResponse({ success: false, error: 'Item not found' }, 404, env);
+    }
+
+    // INSERT，利用 UNIQUE(user_uid, item_id) 天然幂等
+    try {
+      await supabaseRequest('/favorites', 'POST', {
+        user_uid: uid,
+        item_id: itemId,
+      }, env);
+    } catch (e) {
+      // 409 = 已存在，视为成功（幂等）
+      if (!String(e.message || '').includes('409')) {
+        throw e;
+      }
+    }
+
+    return jsonResponse({ success: true, data: { favorited: true } }, 200, env);
+  } catch (err) {
+    console.error('favorite error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 5.2 POST /api/unfavorite - 取消收藏（幂等，不存在也返回成功）
+async function handleUnfavorite(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const uid = piUser.uid;
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return jsonResponse({ success: false, error: 'itemId required' }, 400, env);
+    }
+
+    await supabaseRequest(
+      `/favorites?user_uid=eq.${encodeURIComponent(uid)}&item_id=eq.${encodeURIComponent(itemId)}`,
+      'DELETE', null, env
+    );
+
+    return jsonResponse({ success: true, data: { favorited: false } }, 200, env);
+  } catch (err) {
+    console.error('unfavorite error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 5.3 GET /api/favorites - 我的收藏列表（两步查询，避免 PostgREST 关联风险）
+async function handleFavorites(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const uid = piUser.uid;
+
+    // 步骤 1：查 favorites 获取 item_id 列表（按收藏时间倒序）
+    const favs = await supabaseRequest(
+      `/favorites?user_uid=eq.${encodeURIComponent(uid)}&select=item_id,created_at&order=created_at.desc&limit=100`,
+      'GET', null, env
+    );
+    if (!favs || !favs.length) {
+      return jsonResponse({ success: true, data: [] }, 200, env);
+    }
+
+    // 步骤 2：批量查 items 详情（用 in 过滤）
+    const itemIds = favs.map((f) => f.item_id);
+    const inExpr = `(${itemIds.map((id) => encodeURIComponent(id)).join(',')})`;
+    const items = await supabaseRequest(
+      `/items?id=in.${inExpr}&limit=100`,
+      'GET', null, env
+    );
+
+    // 按 favorites 的收藏顺序排序输出
+    // 用 String() 统一 key 类型，避免 number/string 不匹配导致 Map.get 失败
+    const itemMap = new Map((items || []).map((it) => [String(it.id), it]));
+    const ordered = favs
+      .map((f) => itemMap.get(String(f.item_id)))
+      .filter(Boolean);
+
+    return jsonResponse({ success: true, data: ordered }, 200, env);
+  } catch (err) {
+    console.error('favorites error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 5.4 GET /api/favorite-check?itemId=X - 检查当前用户是否已收藏某商品
+async function handleFavoriteCheck(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const uid = piUser.uid;
+    const url = new URL(request.url);
+    const itemId = url.searchParams.get('itemId');
+    if (!itemId) {
+      return jsonResponse({ success: false, error: 'itemId required' }, 400, env);
+    }
+
+    const rows = await supabaseRequest(
+      `/favorites?user_uid=eq.${encodeURIComponent(uid)}&item_id=eq.${encodeURIComponent(itemId)}&select=id&limit=1`,
+      'GET', null, env
+    );
+
+    return jsonResponse({
+      success: true,
+      data: { favorited: !!(rows && rows.length) },
+    }, 200, env);
+  } catch (err) {
+    console.error('favorite-check error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
 // 6. POST /api/complete-order - 买家确认收货
 async function handleCompleteOrder(request, env) {
   try {
@@ -1492,6 +1638,14 @@ export default {
           return await handleMarkShipped(request, env);
         case '/api/my-orders':
           return await handleMyOrders(request, env);
+        case '/api/favorite':
+          return await handleFavorite(request, env);
+        case '/api/unfavorite':
+          return await handleUnfavorite(request, env);
+        case '/api/favorites':
+          return await handleFavorites(request, env);
+        case '/api/favorite-check':
+          return await handleFavoriteCheck(request, env);
         case '/api/transfer-to-seller':
           return await handleTransferToSeller(request, env);
         default:

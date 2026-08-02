@@ -30,5 +30,35 @@ CREATE INDEX IF NOT EXISTS idx_orders_a2u_payment_id ON orders(a2u_payment_id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS expected_amount NUMERIC DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0;
 
--- 刷新 schema cache（让 REST API 识别新列）
+-- ========== favorites 表（用户收藏关系）==========
+-- 存储 user_uid (Pi 用户 UID) 与 item_id 的收藏关系
+-- items.fav_count 保留为已有字段，本表为真实数据源（COUNT 聚合）
+-- 不手动维护 fav_count，避免增删收藏/异常回滚导致计数不同步
+-- 如后期性能需要，再增加 trigger 自动维护 fav_count
+CREATE TABLE IF NOT EXISTS favorites (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_uid TEXT NOT NULL,                       -- Pi 用户 UID（与 orders.buyer_id/seller_id 一致）
+  item_id BIGINT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_uid, item_id)                     -- 同一用户对同一商品只能收藏一次（自动建联合唯一索引）
+);
+
+-- 单列索引：支撑"按用户查收藏列表"和"按商品统计收藏数"
+CREATE INDEX IF NOT EXISTS idx_favorites_user_uid ON favorites(user_uid);
+CREATE INDEX IF NOT EXISTS idx_favorites_item_id ON favorites(item_id);
+
+-- RLS 策略（与 items/messages 表风格一致，测试网阶段宽松）
+-- 用户身份由 backend-worker.js 通过 Pi Authorization token 校验，不信任前端传参
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS favorites_select ON favorites;
+CREATE POLICY favorites_select ON favorites
+  FOR SELECT USING (true);
+DROP POLICY IF EXISTS favorites_insert ON favorites;
+CREATE POLICY favorites_insert ON favorites
+  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS favorites_delete ON favorites;
+CREATE POLICY favorites_delete ON favorites
+  FOR DELETE USING (true);
+
+-- 刷新 schema cache（让 REST API 识别新表/新列）
 NOTIFY pgrst, 'reload schema';
