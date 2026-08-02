@@ -1,6 +1,6 @@
 /* ============ Card HTML Builders ============ */
 
-import { escapeHtml, fmtPrice } from '../utils';
+import { escapeHtml, fmtPrice, timeAgo } from '../utils';
 
 /**
  * Generate HTML for a horizontal scroll recommended item.
@@ -22,12 +22,29 @@ export function recoHTML(it) {
 
 /**
  * Generate HTML for a grid card item.
+ * 闲鱼/转转风格：图片 → 标题 → 价格（π图标）→ 元信息（城市/浏览/收藏/时间）
+ * 空字段不渲染对应片段。
  */
 export function cardHTML(it) {
   const badges = [];
   if (it.tpl === 'reco') badges.push('<span class="badge">🔥 推荐</span>');
   if (it.status === 'sold') badges.push('<span class="badge" style="background:rgba(100,116,139,.95)">已售</span>');
   if (it.city) badges.push('<span class="badge verify">认证</span>');
+
+  // 元信息片段：按需拼接，空值不显示
+  const metaParts = [];
+  if (it.city) metaParts.push(`<span class="cm-loc">📍 ${escapeHtml(it.city)}</span>`);
+  metaParts.push(`<span class="cm-views">👁 ${it.views || 0}</span>`);
+  if (it.fav_count && it.fav_count > 0) metaParts.push(`<span class="cm-fav">❤️ ${it.fav_count}</span>`);
+  if (it.created_at) {
+    const ts = new Date(it.created_at).getTime();
+    if (!isNaN(ts)) metaParts.push(`<span class="cm-time">${timeAgo(ts)}</span>`);
+  }
+
+  // 运费/包邮标签
+  const shipLabel = it.shipping_fee > 0
+    ? `运费 ${fmtPrice(it.shipping_fee)}π`
+    : '包邮';
 
   return `<div class="card" onclick="window.openDetail(${it.id})">
     <div class="pic">
@@ -41,14 +58,10 @@ export function cardHTML(it) {
     <div class="info">
       <p class="title">${escapeHtml(it.title)}</p>
       <div class="price-row">
-        <div class="price">${fmtPrice(it.price)} π</div>
-        <div style="font-size:11px;color:var(--ink-2)">${it.cat}${it.shipping_fee > 0 ? ' · 运费' + fmtPrice(it.shipping_fee) + 'π' : ' · 包邮'}</div>
+        <div class="price"><span class="pi-ico">π</span>${fmtPrice(it.price)}</div>
+        <div class="ship-tag">${shipLabel}</div>
       </div>
-      <div class="seller">
-        <div class="avatar">${(it.seller || 'U').slice(0, 1)}</div>
-        <span>${escapeHtml(it.seller || '卖家')}</span>
-        <span class="fav-count">👁 ${it.views || 0}</span>
-      </div>
+      <div class="card-meta">${metaParts.join('')}</div>
     </div>
   </div>`;
 }

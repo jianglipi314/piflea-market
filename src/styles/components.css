@@ -155,6 +155,28 @@
   font-weight: 800;
   font-size: 18px;
   letter-spacing: -0.3px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+/* π 图标：小一号，弱化 */
+.card .price .pi-ico {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--brand);
+  margin-right: 1px;
+}
+
+/* 运费/包邮标签：药丸样式 */
+.card .ship-tag {
+  font-size: 10px;
+  color: var(--ok);
+  background: rgba(34, 197, 94, 0.1);
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* 元数据弱化：price-row 内右侧分类/包邮信息 */
@@ -171,6 +193,32 @@
   margin-left: 2px;
 }
 
+/* 卡片元信息行：城市/浏览/收藏/时间 */
+.card .card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 11px;
+  color: var(--ink-2);
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+}
+
+.card .card-meta > span {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.card .card-meta .cm-time {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* 卖家行（旧版，保留以防外部引用） */
 .card .seller {
   display: flex;
   align-items: center;
