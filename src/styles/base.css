@@ -79,6 +79,25 @@ img {
   box-shadow: var(--shadow);
 }
 
+/* 顶部头像按钮：未登录灰色，登录后品牌色 */
+.avatar-btn {
+  cursor: pointer;
+  font-size: 17px;
+  background: var(--line);
+  color: var(--ink-2);
+  transition: transform 0.15s ease, background 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.avatar-btn.logged-in {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff;
+  font-size: 15px;
+}
+.avatar-btn:active {
+  transform: scale(0.92);
+}
+
 .top-title {
   font-weight: 700;
   font-size: 16px;

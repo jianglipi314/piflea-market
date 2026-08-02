@@ -357,6 +357,25 @@ export function updatePiButtonState() {
     el.textContent = '请在Pi浏览器中打开';
     el.style.color = 'var(--ink-2)';
   }
+
+  // 同步顶部头像：登录显示首字母 + 品牌色背景，未登录显示 👤 + 灰色
+  updateTopAvatar();
+}
+
+/**
+ * 同步顶部头像显示。
+ */
+export function updateTopAvatar() {
+  const av = document.getElementById('topAvatar');
+  if (!av) return;
+  const user = getPiUser();
+  if (user && user.username) {
+    av.textContent = (user.username).slice(0, 1).toUpperCase();
+    av.classList.add('logged-in');
+  } else {
+    av.textContent = '👤';
+    av.classList.remove('logged-in');
+  }
 }
 
 /**

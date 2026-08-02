@@ -51,8 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initSheet();
 
   // Topbar / page buttons (replace inline onclick with addEventListener for Pi Browser compat)
-  const menuBtnEl = document.getElementById('btn-menu');
-  if (menuBtnEl) menuBtnEl.addEventListener('click', () => openSheet('menu'));
+  // 顶部头像：点击进入"我的"页面
+  const topAvatar = document.getElementById('topAvatar');
+  if (topAvatar && !topAvatar._bound) {
+    topAvatar._bound = true;
+    topAvatar.addEventListener('click', () => goto('mine'));
+  }
 
   const publishCta = document.getElementById('btn-publish-cta');
   if (publishCta) publishCta.addEventListener('click', () => goto('publish'));
@@ -136,8 +140,6 @@ function applyDarkOnLoad() {
   const isDark = !!state.dark;
   document.documentElement.setAttribute('data-dark', isDark ? '1' : '');
   document.documentElement.classList.toggle('dark', isDark);
-  const btn = document.getElementById('darkBtn');
-  if (btn) btn.textContent = isDark ? '☀' : '🌙';
   const tg = document.getElementById('darkToggle');
   if (tg) tg.classList.toggle('on', isDark);
 }
