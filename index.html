@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>pi 跳蚤市场 · 先锋二手</title>
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-  <script type="module" crossorigin src="/assets/index-DunnBX3x.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-orZ1n9OW.css">
+  <script type="module" crossorigin src="/assets/index-Bko0VFeV.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Bp40_9VX.css">
 </head>
 <body>
   <div class="app">
@@ -266,11 +266,16 @@
         <div class="id" id="m-id">未登录</div>
       </div>
     </div>
+    <div class="wallet stats-card" id="mine-stats">
+      <div class="cell" data-stat="post"><div class="n" id="stat-posted">0</div><div class="l">发布商品</div></div>
+      <div class="cell" data-stat="buy"><div class="n" id="stat-bought">0</div><div class="l">已购买</div></div>
+      <div class="cell" data-stat="sell"><div class="n" id="stat-sold">0</div><div class="l">已出售</div></div>
+    </div>
     <div class="tabs" id="mine-tabs">
-      <button class="tab" id="tab-post">我的发布</button>
-      <button class="tab" id="tab-buy">我的购买</button>
-      <button class="tab" id="tab-sell">我的出售</button>
-      <button class="tab" id="tab-hist">浏览记录</button>
+      <button class="tab" id="tab-post"><span class="tic">📦</span>我的发布</button>
+      <button class="tab" id="tab-buy"><span class="tic">🛒</span>我的购买</button>
+      <button class="tab" id="tab-sell"><span class="tic">💰</span>我的出售</button>
+      <button class="tab" id="tab-hist"><span class="tic">👁</span>浏览记录</button>
     </div>
     <div id="mineLoader" class="loading" style="display:none">加载中...</div>
     <div class="list" id="mine-list"></div>
@@ -279,9 +284,9 @@
     <div class="list" id="orderList" style="display:none"></div>
     <div class="empty" id="orderEmpty" style="display:none;padding:20px 14px">暂无订单</div>
   <div class="setting">
+      <div class="srow"><div class="lb">🪙 Pi 账号</div><div class="val" id="piAuthText" style="cursor:pointer;color:var(--ink-2);font-size:13px">检测中...</div></div>
       <div class="srow"><div class="lb">📍 默认位置</div><div class="val" id="s-city">未设置</div></div>
       <div class="srow"><div class="lb">🌙 深色模式</div><div class="toggle" id="darkToggle"></div></div>
-      <div class="srow"><div class="lb">🪙 Pi 账号</div><div class="val" id="piAuthText" style="cursor:pointer;color:var(--ink-2);font-size:13px">检测中...</div></div>
     </div>
     <div class="setting-links">
       <div class="srow link" id="link-terms"><div class="lb">📜 用户协议</div><span class="arrow">›</span></div>
