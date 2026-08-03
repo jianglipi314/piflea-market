@@ -42,11 +42,11 @@ function initMineButtons() {
     backBtn._bound = true;
     backBtn.addEventListener('click', showMineOverview);
   }
-  // Pi 账号行（根据登录状态决定 piLogin / piLogout）
-  const piText = document.getElementById('piAuthText');
-  if (piText && !piText._bound) {
-    piText._bound = true;
-    piText.addEventListener('click', function() {
+  // Pi 账号按钮（登录/退出登录）
+  const piBtn = document.getElementById('piAuthBtn');
+  if (piBtn && !piBtn._bound) {
+    piBtn._bound = true;
+    piBtn.addEventListener('click', function() {
       const user = getPiUser();
       if (user) {
         piLogout();
@@ -438,20 +438,20 @@ export function applyPiUser() {
  * Update Pi auth button state.
  */
 export function updatePiButtonState() {
-  const el = document.getElementById('piAuthText');
+  const el = document.getElementById('piAuthBtn');
   if (!el) return;
 
   const user = getPiUser();
   const hasPi = typeof window.Pi !== 'undefined';
 
   if (user && user.username) {
-    el.textContent = '@' + user.username;
-    el.style.color = 'var(--ok)';
+    el.textContent = '退出登录';
+    el.style.color = 'var(--ink-2)';
   } else if (hasPi) {
-    el.textContent = '点击登录';
+    el.textContent = '登录 Pi 账号';
     el.style.color = 'var(--brand)';
   } else {
-    el.textContent = '请在Pi浏览器中打开';
+    el.textContent = '请在 Pi 浏览器中打开';
     el.style.color = 'var(--ink-2)';
   }
 
