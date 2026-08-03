@@ -50,10 +50,8 @@ function initMineButtons() {
       const user = getPiUser();
       if (user) {
         piLogout();
-      } else if (typeof window.Pi !== 'undefined') {
-        piLogin();
       } else {
-        toast('请下载 Pi Browser App 访问本网站');
+        piLogin();
       }
     });
   }
@@ -442,17 +440,13 @@ export function updatePiButtonState() {
   if (!el) return;
 
   const user = getPiUser();
-  const hasPi = typeof window.Pi !== 'undefined';
 
   if (user && user.username) {
     el.textContent = '退出登录';
     el.style.color = 'var(--ink-2)';
-  } else if (hasPi) {
+  } else {
     el.textContent = '登录 Pi 账号';
     el.style.color = 'var(--brand)';
-  } else {
-    el.textContent = '请在 Pi 浏览器中打开';
-    el.style.color = 'var(--ink-2)';
   }
 
   // 同步顶部头像：登录显示首字母 + 品牌色背景，未登录显示 👤 + 灰色
