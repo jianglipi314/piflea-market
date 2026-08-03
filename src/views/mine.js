@@ -12,7 +12,7 @@ import { apiFetch, BACKEND_URL as BACKEND } from '../api';
 
 // 用 addEventListener 绑定 tab 按钮（Pi Browser 不支持内联 onclick）
 function initTabListeners() {
-  const tabMap = { 'tab-post': 'post', 'tab-buy': 'buy', 'tab-sell': 'sell', 'tab-fav': 'fav', 'tab-hist': 'hist' };
+  const tabMap = { 'tab-post': 'post', 'tab-buy': 'buy', 'tab-sell': 'sell', 'tab-hist': 'hist' };
   Object.keys(tabMap).forEach(function(id) {
     const el = document.getElementById(id);
     if (el) {
@@ -87,6 +87,7 @@ export function renderMine() {
       if (stat === 'post') switchMine('post');
       else if (stat === 'buy') switchMine('buy');
       else if (stat === 'sell') switchMine('sell');
+      else if (stat === 'fav') switchMine('fav');
     });
   }
 

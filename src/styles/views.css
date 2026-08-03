@@ -736,8 +736,8 @@
 .wallet .n { font-size: 18px; font-weight: 800; color: var(--ink); }
 .wallet .l { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
 
-/* 我的页面交易统计卡（3 列，可点击跳转 tab） */
-.stats-card { grid-template-columns: repeat(3, 1fr); }
+/* 我的页面交易统计卡（4 列，可点击跳转 tab） */
+.stats-card { grid-template-columns: repeat(4, 1fr); }
 .stats-card .cell { cursor: pointer; transition: transform 0.12s ease; -webkit-tap-highlight-color: transparent; }
 .stats-card .cell:active { transform: scale(0.96); }
 .stats-card .cell .n { color: var(--brand); }
