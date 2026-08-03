@@ -385,14 +385,11 @@ async function uploadImageToSupabase(base64Data, filename) {
  * Submit the publish form.
  */
 export async function doPublish(ev) {
-  console.log('[doPublish] called');
   if (ev) ev.preventDefault();
-  
+
   const btn = document.getElementById('f-submit');
-  console.log('[doPublish] btn disabled:', btn?.disabled, 'uploading:', state.uploading);
-  
+
   if (state.uploading) {
-    console.log('[doPublish] uploading is true, returning');
     return;
   }
 

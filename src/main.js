@@ -115,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // Pi SDK 初始化完成但无缓存用户，立即请求 payments scope 登录
       import('./pi-sdk').then((mod) => {
         if (mod.isPiAvailable && mod.isPiAvailable() && !mod.isPiAuthenticated()) {
-          console.log('[main] Auto-triggering Pi authenticate with payments scope');
           mod.authenticateWithPi().then(() => updatePiButtonState());
         }
       });

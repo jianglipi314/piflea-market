@@ -23,7 +23,6 @@ function initTabListeners() {
       newEl.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[mine] tab点击:', tabMap[id]);
         switchMine(tabMap[id]);
       });
     }
@@ -556,7 +555,6 @@ let cachedOrders = { buyer: [], seller: [] };
 let currentOrderRole = null;
 
 export async function loadOrders(role) {
-  console.log('[loadOrders] role=', role);
   const orderLoader = document.getElementById('orderLoader');
   const orderList = document.getElementById('orderList');
   const orderEmpty = document.getElementById('orderEmpty');
@@ -606,7 +604,6 @@ export async function loadOrders(role) {
     updateMineStats();
 
     orderList.innerHTML = orders.map(function(o) {
-      console.log('[renderOrders] orderId=', o.id, 'title=', o.item_title);
       return '<div class="row-item" data-action="gotoOrder" data-id="' + o.id + '" style="cursor:pointer">' +
         '<div class="pic" style="background:var(--bg);display:grid;place-items:center;font-size:28px;color:#b8bfd1">' +
           '\ud83d\udce6' +
@@ -635,7 +632,6 @@ export async function loadOrders(role) {
 }
 
 export function gotoOrderDetail(orderId) {
-  console.log('[gotoOrderDetail] orderId=', orderId);
   const role = state.mineTab === 'buy' ? 'buyer' : 'seller';
   const orders = cachedOrders[role] || [];
   const order = orders.find((o) => String(o.id) === String(orderId));
