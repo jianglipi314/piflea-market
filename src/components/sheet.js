@@ -3,6 +3,8 @@
 import { toast } from '../utils';
 import { state } from '../main';
 import { goto } from '../router';
+import { apiFetch } from '../api';
+import { getPiUser } from '../pi-sdk';
 
 /**
  * Open a sheet by kind.
@@ -33,13 +35,73 @@ export function openSheet(kind) {
     }
   } else if (kind === 'report') {
     title.textContent = '举报该商品';
-    body.innerHTML = '请选择举报类型：';
-    acts.innerHTML = ['虚假描述', '违禁品', '涉嫌诈骗', '其他']
-      .map(
-        (t) =>
-          `<button class="btn ghost" onclick="toast('已提交：${t}');closeSheet()">${t}</button>`
-      )
-      .join('');
+    const reasons = ['虚假描述', '违禁品', '涉嫌诈骗', '其他'];
+    body.innerHTML =
+      '<div style="font-size:13px;color:var(--ink-2);margin-bottom:10px">请选择举报类型：</div>' +
+      '<div id="report-reasons" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
+        reasons.map((t) =>
+          '<button type="button" class="btn ghost" data-reason="' + t + '" ' +
+          'style="padding:8px 14px;font-size:13px">' + t + '</button>'
+        ).join('') +
+      '</div>' +
+      '<textarea id="report-detail" placeholder="补充说明（选填，最多 500 字）" maxlength="500" ' +
+      'style="width:100%;min-height:72px;padding:10px;border:1px solid var(--line);border-radius:8px;' +
+      'font-size:13px;background:var(--bg);color:var(--ink);box-sizing:border-box;resize:vertical"></textarea>';
+    acts.innerHTML =
+      '<button class="btn ghost" id="report-cancel">取消</button>' +
+      '<button class="btn primary" id="report-submit">提交举报</button>';
+
+    // 选项单选（事件委托，替代内联 onclick，兼容 Pi Browser）
+    let selectedReason = '';
+    const reasonBox = document.getElementById('report-reasons');
+    reasonBox.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-reason]');
+      if (!btn) return;
+      selectedReason = btn.dataset.reason;
+      reasonBox.querySelectorAll('[data-reason]').forEach(function(b) {
+        b.style.background = b === btn ? 'var(--ink)' : 'var(--card)';
+        b.style.color = b === btn ? '#fff' : 'var(--ink-2)';
+      });
+    });
+
+    // 取消
+    document.getElementById('report-cancel').addEventListener('click', closeSheet);
+
+    // 提交举报
+    document.getElementById('report-submit').addEventListener('click', async function() {
+      const itemId = state.currentDetailId;
+      if (!itemId) { toast('未找到商品'); return; }
+      if (!selectedReason) { toast('请选择举报类型'); return; }
+      if (!getPiUser()) { toast('请先登录 Pi 账号'); return; }
+      const detail = (document.getElementById('report-detail').value || '').trim();
+      const btn = this;
+      btn.disabled = true;
+      btn.textContent = '提交中...';
+      try {
+        const res = await apiFetch('/api/report', {
+          method: 'POST',
+          body: JSON.stringify({
+            itemId: itemId,
+            reason: selectedReason,
+            detail: detail || undefined,
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          toast('举报已提交，平台将尽快处理');
+          closeSheet();
+        } else {
+          toast(json.error || '提交失败');
+          btn.disabled = false;
+          btn.textContent = '提交举报';
+        }
+      } catch (e) {
+        console.error('report submit err:', e);
+        toast('网络错误：' + (e?.message || e));
+        btn.disabled = false;
+        btn.textContent = '提交举报';
+      }
+    });
   } else if (kind === 'feedback') {
     title.textContent = '帮助与反馈';
     body.innerHTML = `
