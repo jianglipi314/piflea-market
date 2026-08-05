@@ -51,6 +51,12 @@ export function openSheet(kind) {
       '<button class="btn ghost" id="report-cancel">取消</button>' +
       '<button class="btn primary" id="report-submit">提交举报</button>';
 
+    // 隐藏 sheet 默认底部"关闭"按钮（report 已自带"取消"，避免冗余占位导致内容被裁剪）
+    const defaultActions = document.querySelector('#sheet .actions');
+    if (defaultActions) {
+      defaultActions.style.display = 'none';
+    }
+
     // 选项单选（事件委托，替代内联 onclick，兼容 Pi Browser）
     let selectedReason = '';
     const reasonBox = document.getElementById('report-reasons');
@@ -123,6 +129,11 @@ export function openSheet(kind) {
 
 export function closeSheet() {
   document.getElementById('sheet').classList.remove('on');
+  // 恢复 sheet 默认底部"关闭"按钮显示（report 分支曾隐藏它）
+  const defaultActions = document.querySelector('#sheet .actions');
+  if (defaultActions) {
+    defaultActions.style.display = '';
+  }
 }
 
 export function initSheet() {
