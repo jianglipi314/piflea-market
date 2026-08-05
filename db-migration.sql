@@ -60,5 +60,30 @@ DROP POLICY IF EXISTS favorites_delete ON favorites;
 CREATE POLICY favorites_delete ON favorites
   FOR DELETE USING (true);
 
+-- ========== reports 表（用户举报）==========
+-- 存储用户对商品的举报记录
+-- reporter_uid 来自 Pi token 解析，不信任前端传参
+-- 不设 UNIQUE：允许同一用户对同一商品多次举报（保留举报历史）
+-- 不维护 items.report_count，真实数据来自 reports 表 COUNT 聚合
+-- RLS：只开放 SELECT，不开放 INSERT（仅由 Worker 用 service_role key 写入）
+CREATE TABLE IF NOT EXISTS reports (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  reporter_uid TEXT NOT NULL,                      -- Pi 用户 UID（与 orders.buyer_id 一致）
+  item_id BIGINT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,                            -- 虚假描述 / 违禁品 / 涉嫌诈骗 / 其他
+  detail TEXT,                                     -- 可选补充说明（Worker 限长 500）
+  status TEXT NOT NULL DEFAULT 'pending',          -- pending / reviewed / dismissed
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_item_id ON reports(item_id);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter_uid ON reports(reporter_uid);
+
+-- RLS：仅开放 SELECT（前端只读），INSERT 不开放 policy → 只能由 Worker service_role 写入
+ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS reports_select ON reports;
+CREATE POLICY reports_select ON reports FOR SELECT USING (true);
+
 -- 刷新 schema cache（让 REST API 识别新表/新列）
 NOTIFY pgrst, 'reload schema';

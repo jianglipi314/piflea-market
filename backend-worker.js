@@ -100,6 +100,8 @@ const AUTH_REQUIRED_ROUTES = [
   '/api/unfavorite',
   '/api/favorites',
   '/api/favorite-check',
+  // 举报 API：身份从 Authorization Bearer token 获取，禁止前端传 reporter_uid
+  '/api/report',
 ];
 
 // 管理员 UID 白名单
@@ -1053,7 +1055,55 @@ async function handleFavoriteCheck(request, env) {
   }
 }
 
-// 6. POST /api/complete-order - 买家确认收货
+// 6. POST /api/report - 用户提交举报（保留历史，不设 UNIQUE，允许同一用户多次举报）
+async function handleReport(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const reporterUid = piUser.uid;
+
+    const body = await request.json();
+    const itemId = body.itemId;
+    const reason = body.reason;
+    const detail = body.detail ? String(body.detail).slice(0, 500) : null;
+
+    // 参数校验
+    if (!itemId) {
+      return jsonResponse({ success: false, error: 'itemId required' }, 400, env);
+    }
+    const ALLOWED_REASONS = ['虚假描述', '违禁品', '涉嫌诈骗', '其他'];
+    if (!ALLOWED_REASONS.includes(reason)) {
+      return jsonResponse({ success: false, error: 'invalid reason' }, 400, env);
+    }
+
+    // 校验商品存在（不限制 status，已下架商品也可举报）
+    const items = await supabaseRequest(
+      `/items?id=eq.${encodeURIComponent(itemId)}&select=id&limit=1`,
+      'GET', null, env
+    );
+    if (!items || !items.length) {
+      return jsonResponse({ success: false, error: 'Item not found' }, 404, env);
+    }
+
+    // 写入 reports（Worker 用 service_role key，绕过 RLS；reports 表未开放 INSERT policy）
+    await supabaseRequest('/reports', 'POST', {
+      reporter_uid: reporterUid,
+      item_id: itemId,
+      reason: reason,
+      detail: detail,
+      status: 'pending',
+    }, env);
+
+    return jsonResponse({ success: true, data: { reported: true } }, 200, env);
+  } catch (err) {
+    console.error('report error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 7. POST /api/complete-order - 买家确认收货
 async function handleCompleteOrder(request, env) {
   try {
     const { order_id, buyer_id } = await request.json();
@@ -1646,6 +1696,8 @@ export default {
           return await handleFavorites(request, env);
         case '/api/favorite-check':
           return await handleFavoriteCheck(request, env);
+        case '/api/report':
+          return await handleReport(request, env);
         case '/api/transfer-to-seller':
           return await handleTransferToSeller(request, env);
         default:
