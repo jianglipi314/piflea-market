@@ -559,7 +559,7 @@
   display: none;
   align-items: flex-end;
   justify-content: center;
-  z-index: 25;
+  z-index: 50;
 }
 
 .sheet-mask.on {
