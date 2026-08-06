@@ -171,6 +171,9 @@ export async function openDetail(id) {
   if (it.status === 'sold') {
     statusTag.textContent = '🏁 已售';
     statusTag.className = 'status-tag sold';
+  } else if (it.status === 'blocked') {
+    statusTag.textContent = '🚫 已下架';
+    statusTag.className = 'status-tag sold';
   } else {
     statusTag.textContent = '✓ 在售';
     statusTag.className = 'status-tag';
@@ -322,10 +325,14 @@ export async function openDetail(id) {
     });
   }
 
-  // Update buy button for sold items
+  // Update buy button for sold / blocked items
   const buyBtn = document.getElementById('d-buy-btn');
   if (it.status === 'sold') {
     buyBtn.textContent = '🏁 已售出';
+    buyBtn.disabled = true;
+    buyBtn.style.opacity = '0.6';
+  } else if (it.status === 'blocked') {
+    buyBtn.textContent = '🚫 商品已下架';
     buyBtn.disabled = true;
     buyBtn.style.opacity = '0.6';
   } else {

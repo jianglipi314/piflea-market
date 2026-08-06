@@ -330,14 +330,41 @@
       <div class="stat"><div class="n" id="a-view">0</div><div class="l">总浏览</div></div>
       <div class="stat"><div class="n" id="a-pending">0</div><div class="l">待转账</div></div>
     </div>
-    <div class="section-title"><h3>待转账订单</h3><span class="sub" id="admin-refresh-transfers">刷新</span></div>
-    <div id="transferLoader" class="loading" style="display:none">加载中...</div>
-    <div class="list" id="transferList"></div>
-    <div id="transferEmpty" class="empty" style="display:none;padding:12px 0">暂无待转账订单</div>
-    <div class="section-title"><h3>全部商品</h3><span class="sub">可切换推荐</span></div>
-    <div id="adminLoader" class="loading" style="display:none">加载中...</div>
-    <div class="list" id="adminList"></div>
-    <div class="empty" style="padding:18px 0 60px">— end —</div>
+    <div class="admin-tabs" id="adminTabs" style="display:flex;gap:0;border-bottom:1px solid var(--line);margin:12px 0 4px">
+      <button class="admin-tab" data-admin-tab="transfers" style="flex:1;padding:10px 6px;font-size:13px;border:none;background:transparent;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent">待转账</button>
+      <button class="admin-tab" data-admin-tab="reports" style="flex:1;padding:10px 6px;font-size:13px;border:none;background:transparent;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent">举报队列</button>
+      <button class="admin-tab" data-admin-tab="products" style="flex:1;padding:10px 6px;font-size:13px;border:none;background:transparent;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent">商品管理</button>
+    </div>
+
+    <div id="panel-transfers" class="admin-panel">
+      <div class="section-title"><h3>待转账订单</h3><span class="sub" id="admin-refresh-transfers">刷新</span></div>
+      <div id="transferLoader" class="loading" style="display:none">加载中...</div>
+      <div class="list" id="transferList"></div>
+      <div id="transferEmpty" class="empty" style="display:none;padding:12px 0">暂无待转账订单</div>
+    </div>
+
+    <div id="panel-reports" class="admin-panel" style="display:none">
+      <div class="section-title">
+        <h3>举报队列</h3>
+        <span class="sub" id="admin-refresh-reports">刷新</span>
+      </div>
+      <div id="reportsFilter" style="display:flex;gap:6px;margin:8px 0 4px;flex-wrap:wrap">
+        <button class="admin-filter on" data-report-filter="pending" style="padding:6px 10px;font-size:12px;border:1px solid var(--line);border-radius:14px;background:var(--ink);color:#fff;cursor:pointer">待处理</button>
+        <button class="admin-filter" data-report-filter="reviewed" style="padding:6px 10px;font-size:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink-2);cursor:pointer">已处理</button>
+        <button class="admin-filter" data-report-filter="dismissed" style="padding:6px 10px;font-size:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink-2);cursor:pointer">已忽略</button>
+        <button class="admin-filter" data-report-filter="all" style="padding:6px 10px;font-size:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink-2);cursor:pointer">全部</button>
+      </div>
+      <div id="reportsLoader" class="loading" style="display:none">加载中...</div>
+      <div class="list" id="reportsList"></div>
+      <div id="reportsEmpty" class="empty" style="display:none;padding:12px 0">暂无举报记录</div>
+    </div>
+
+    <div id="panel-products" class="admin-panel" style="display:none">
+      <div class="section-title"><h3>全部商品</h3><span class="sub">可切换推荐</span></div>
+      <div id="adminLoader" class="loading" style="display:none">加载中...</div>
+      <div class="list" id="adminList"></div>
+      <div class="empty" style="padding:18px 0 60px">— end —</div>
+    </div>
   </section>
 
   <!-- Bottom Nav -->

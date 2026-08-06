@@ -102,10 +102,23 @@ const AUTH_REQUIRED_ROUTES = [
   '/api/favorite-check',
   // 举报 API：身份从 Authorization Bearer token 获取，禁止前端传 reporter_uid
   '/api/report',
+  // 管理员 API：所有 /api/admin/* 都需要 Pi token 解析 uid，handler 内再校验 ADMIN_UIDS
+  '/api/admin/reports',
+  '/api/admin/reports/review',
+  '/api/admin/items/block',
+  '/api/admin/items/unblock',
+  '/api/admin/pending-transfers',
+  '/api/admin/confirm-transfer',
 ];
 
 // 管理员 UID 白名单
 const ADMIN_UIDS = ['01b4a2e0-f4b9-4a68-abcf-e0b879880707'];
+
+// 管理员鉴权（所有 /api/admin/* 必须调用）
+function requireAdmin(request) {
+  const uid = request.piUser && request.piUser.uid;
+  return !!(uid && ADMIN_UIDS.includes(uid));
+}
 
 // 调用 Pi Platform API（使用 Server API Key）
 async function piPlatformRequest(path, method = 'GET', body = null, env, network = 'mainnet') {
@@ -1103,6 +1116,203 @@ async function handleReport(request, env) {
   }
 }
 
+// ============ 管理员 API ============
+// 所有 /api/admin/* 路由：
+// 1. 已在 AUTH_REQUIRED_ROUTES，verifyPiToken 解析后 request.piUser.uid 可用
+// 2. handler 内调用 requireAdmin(request) 校验 ADMIN_UIDS 白名单
+// 3. 非管理员一律 403，不泄露任何数据
+
+// 8. GET /api/admin/reports - 举报队列（支持 status 筛选）
+async function handleAdminReports(request, env) {
+  if (!requireAdmin(request)) {
+    return jsonResponse({ success: false, error: 'Forbidden' }, 403, env);
+  }
+  try {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status') || 'pending'; // pending / reviewed / dismissed / all
+
+    // 两步查询：先查 reports，再批量查 items 标题（避免 PostgREST 关联风险）
+    let filter = '';
+    if (status !== 'all') {
+      filter = `&status=eq.${encodeURIComponent(status)}`;
+    }
+    const reports = await supabaseRequest(
+      `/reports?order=created_at.desc&limit=200${filter}`,
+      'GET', null, env
+    );
+
+    const list = reports || [];
+    if (list.length === 0) {
+      return jsonResponse({ success: true, data: [] }, 200, env);
+    }
+
+    // 批量查询对应商品标题和当前状态
+    const itemIds = [...new Set(list.map(r => r.item_id))];
+    const items = await supabaseRequest(
+      `/items?id=in.(${itemIds.join(',')})&select=id,title,status,owner_id`,
+      'GET', null, env
+    );
+    const itemMap = new Map();
+    (items || []).forEach(it => itemMap.set(it.id, it));
+
+    const data = list.map(r => {
+      const it = itemMap.get(r.item_id) || {};
+      return {
+        id: r.id,
+        item_id: r.item_id,
+        item_title: it.title || '(商品已删除)',
+        item_status: it.status || 'unknown',
+        item_owner_id: it.owner_id || null,
+        reason: r.reason,
+        detail: r.detail || '',
+        status: r.status,
+        reporter_uid: r.reporter_uid,
+        created_at: r.created_at,
+        reviewed_at: r.reviewed_at || null,
+        reviewed_by: r.reviewed_by || null,
+        admin_note: r.admin_note || '',
+      };
+    });
+
+    return jsonResponse({ success: true, data }, 200, env);
+  } catch (err) {
+    console.error('admin reports error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 9. POST /api/admin/reports/review - 处理举报（标记 reviewed/dismissed）
+async function handleAdminReportReview(request, env) {
+  if (!requireAdmin(request)) {
+    return jsonResponse({ success: false, error: 'Forbidden' }, 403, env);
+  }
+  try {
+    const body = await request.json();
+    const { reportId, action, note } = body;
+    if (!reportId || !action) {
+      return jsonResponse({ success: false, error: 'reportId and action required' }, 400, env);
+    }
+    if (action !== 'reviewed' && action !== 'dismissed') {
+      return jsonResponse({ success: false, error: 'action must be reviewed or dismissed' }, 400, env);
+    }
+
+    const adminUid = request.piUser.uid;
+    const updates = {
+      status: action,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: adminUid,
+      admin_note: note ? String(note).slice(0, 500) : null,
+    };
+
+    await supabaseRequest(
+      `/reports?id=eq.${encodeURIComponent(reportId)}`,
+      'PATCH', updates, env
+    );
+
+    return jsonResponse({ success: true, data: { id: reportId, status: action } }, 200, env);
+  } catch (err) {
+    console.error('admin report review error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 10. POST /api/admin/items/block - 下架商品（items.status = 'blocked'）
+async function handleAdminItemBlock(request, env) {
+  if (!requireAdmin(request)) {
+    return jsonResponse({ success: false, error: 'Forbidden' }, 403, env);
+  }
+  try {
+    const body = await request.json();
+    const { itemId } = body;
+    if (!itemId) {
+      return jsonResponse({ success: false, error: 'itemId required' }, 400, env);
+    }
+
+    await supabaseRequest(
+      `/items?id=eq.${encodeURIComponent(itemId)}`,
+      'PATCH', { status: 'blocked' }, env
+    );
+
+    console.log('[ADMIN] item blocked', { itemId, admin: request.piUser.uid });
+    return jsonResponse({ success: true, data: { id: itemId, status: 'blocked' } }, 200, env);
+  } catch (err) {
+    console.error('admin item block error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 11. POST /api/admin/items/unblock - 恢复商品（items.status = 'active'）
+async function handleAdminItemUnblock(request, env) {
+  if (!requireAdmin(request)) {
+    return jsonResponse({ success: false, error: 'Forbidden' }, 403, env);
+  }
+  try {
+    const body = await request.json();
+    const { itemId } = body;
+    if (!itemId) {
+      return jsonResponse({ success: false, error: 'itemId required' }, 400, env);
+    }
+
+    await supabaseRequest(
+      `/items?id=eq.${encodeURIComponent(itemId)}`,
+      'PATCH', { status: 'active' }, env
+    );
+
+    console.log('[ADMIN] item unblocked', { itemId, admin: request.piUser.uid });
+    return jsonResponse({ success: true, data: { id: itemId, status: 'active' } }, 200, env);
+  } catch (err) {
+    console.error('admin item unblock error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 12. GET /api/admin/pending-transfers - 待转账订单（补全缺失的现有 API）
+async function handleAdminPendingTransfers(request, env) {
+  if (!requireAdmin(request)) {
+    return jsonResponse({ success: false, error: 'Forbidden' }, 403, env);
+  }
+  try {
+    // 待转账 = 已支付但未转账给卖家（status=approved，无 a2u_txid）
+    const orders = await supabaseRequest(
+      `/orders?status=eq.approved&order=id.desc&limit=100&select=id,order_no,item_title,item_price,amount,seller_id,buyer_id,created_at`,
+      'GET', null, env
+    );
+    return jsonResponse({ success: true, data: orders || [] }, 200, env);
+  } catch (err) {
+    console.error('admin pending-transfers error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// 13. POST /api/admin/confirm-transfer - 确认已转账（补全缺失的现有 API）
+async function handleAdminConfirmTransfer(request, env) {
+  if (!requireAdmin(request)) {
+    return jsonResponse({ success: false, error: 'Forbidden' }, 403, env);
+  }
+  try {
+    const body = await request.json();
+    const { order_id } = body;
+    if (!order_id) {
+      return jsonResponse({ success: false, error: 'order_id required' }, 400, env);
+    }
+
+    // 标记订单为已完成（管理员手动确认转账）
+    await supabaseRequest(
+      `/orders?id=eq.${encodeURIComponent(order_id)}`,
+      'PATCH', {
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+      }, env
+    );
+
+    console.log('[ADMIN] transfer confirmed', { order_id, admin: request.piUser.uid });
+    return jsonResponse({ success: true, data: { id: order_id, status: 'completed' } }, 200, env);
+  } catch (err) {
+    console.error('admin confirm-transfer error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
 // 7. POST /api/complete-order - 买家确认收货
 async function handleCompleteOrder(request, env) {
   try {
@@ -1700,6 +1910,19 @@ export default {
           return await handleReport(request, env);
         case '/api/transfer-to-seller':
           return await handleTransferToSeller(request, env);
+        // 管理员 API（handler 内 requireAdmin 校验 ADMIN_UIDS）
+        case '/api/admin/reports':
+          return await handleAdminReports(request, env);
+        case '/api/admin/reports/review':
+          return await handleAdminReportReview(request, env);
+        case '/api/admin/items/block':
+          return await handleAdminItemBlock(request, env);
+        case '/api/admin/items/unblock':
+          return await handleAdminItemUnblock(request, env);
+        case '/api/admin/pending-transfers':
+          return await handleAdminPendingTransfers(request, env);
+        case '/api/admin/confirm-transfer':
+          return await handleAdminConfirmTransfer(request, env);
         default:
           return errorResponse('Not found', 404, 'not_found', env);
       }

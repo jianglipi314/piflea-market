@@ -85,5 +85,16 @@ ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS reports_select ON reports;
 CREATE POLICY reports_select ON reports FOR SELECT USING (true);
 
+-- ========== V1 举报审核 + 商品下架 ==========
+-- reports 表增加审核追溯字段：谁处理 / 什么时候处理 / 管理备注
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS reviewed_by TEXT;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS admin_note TEXT;
+
+-- items 表增加 status 字段（支持下架，不删除数据）
+-- active(默认) / blocked(管理员下架) / sold(已售出，预留)
+ALTER TABLE items ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
+
 -- 刷新 schema cache（让 REST API 识别新表/新列）
 NOTIFY pgrst, 'reload schema';
