@@ -4,6 +4,7 @@ import { state } from '../main';
 import { getSupabase } from '../supabase';
 import { escapeHtml, fmtPrice, toast } from '../utils';
 import { apiFetch } from '../api';
+import { isAdminUser } from './mine';
 
 // 当前激活的 admin tab：transfers / reports / products
 let adminActiveTab = 'transfers';
@@ -253,9 +254,15 @@ async function adminBlockItem(itemId, reportId) {
  * Render admin dashboard.
  */
 export async function renderAdmin() {
-  if (!state.admin) {
+  // 双重校验：前端管理员白名单 + state.admin（由 renderAdminEntry 在登录时设置）
+  if (!isAdminUser() && !state.admin) {
     toast('请先在个人中心解锁运营后台');
     return;
+  }
+  // 管理员登录后自动放行（state.admin 可能因缓存丢失，但 UID 在白名单内即允许）
+  if (isAdminUser()) {
+    state.admin = 1;
+    localStorage.setItem('pi_flea_admin_v3', '1');
   }
 
   // 初始化 tab + 筛选事件（幂等，只绑定一次）

@@ -88,6 +88,9 @@ export function renderMine() {
     });
   }
 
+  // 管理员入口：根据当前 Pi 登录 UID 自动显示/隐藏「运营后台」
+  renderAdminEntry();
+
   // 默认显示概览页（不直接进入任何 tab）
   showMineOverview();
 }
@@ -386,6 +389,54 @@ export function toggleAdmin() {
 }
 
 /**
+ * 前端管理员 UID 白名单（与 backend-worker.js 的 ADMIN_UIDS 保持一致）。
+ * 用于在「我的」页面自动显示「运营后台」入口。
+ */
+const ADMIN_UIDS = ['01b4a2e0-f4b9-4a68-abcf-e0b879880707'];
+
+/**
+ * 判断当前 Pi 登录用户是否为管理员。
+ */
+export function isAdminUser() {
+  const u = getPiUser();
+  return !!(u && u.uid && ADMIN_UIDS.includes(u.uid));
+}
+
+/**
+ * 渲染「运营后台」入口到「我的」页面的 setting-links 区。
+ * 仅管理员可见；非管理员或未登录时移除入口。
+ * 幂等：通过 id 复用，重复调用安全。
+ */
+export function renderAdminEntry() {
+  const box = document.querySelector('#view-mine .setting-links');
+  if (!box) return;
+
+  // 移除可能已存在的入口
+  const old = document.getElementById('link-admin');
+  if (old) old.remove();
+
+  if (!isAdminUser()) {
+    // 非管理员：确保 state.admin 不被白名单外用户污染
+    return;
+  }
+
+  // 管理员：设置 state.admin，允许进入 admin 页面
+  state.admin = 1;
+  localStorage.setItem('pi_flea_admin_v3', '1');
+
+  const row = document.createElement('div');
+  row.className = 'srow link';
+  row.id = 'link-admin';
+  row.innerHTML = '<div class="lb">🛠 运营后台</div><span class="arrow">›</span>';
+  if (!row._bound) {
+    row._bound = true;
+    row.addEventListener('click', function() { goto('admin'); });
+  }
+  // 插到 setting-links 最前面，便于管理员快速访问
+  box.insertBefore(row, box.firstChild);
+}
+
+/**
  * Pi login handler.
  */
 export async function piLogin() {
@@ -411,6 +462,8 @@ export function piLogout() {
   if (nm) nm.textContent = '未登录';
   if (id) id.textContent = '未登录';
   updatePiButtonState();
+  // 退出后移除管理员入口
+  renderAdminEntry();
 }
 
 /**
@@ -429,6 +482,8 @@ export function applyPiUser() {
   // Reload items to reflect Pi UID ownership
   import('../views/home').then(mod => mod.loadItems());
   updatePiButtonState();
+  // 登录态变化后同步管理员入口
+  renderAdminEntry();
 }
 
 /**
