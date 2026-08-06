@@ -1155,8 +1155,27 @@ async function handleAdminReports(request, env) {
     const itemMap = new Map();
     (items || []).forEach(it => itemMap.set(it.id, it));
 
+    // 第 3 步：查询所有举报的 item_id（不限 status），统计每商品总举报次数 → 计算风险等级
+    // risk_level: count >= 3 → high, count === 2 → medium, 否则 normal
+    let countMap = new Map();
+    try {
+      const allReports = await supabaseRequest(
+        `/reports?select=item_id&limit=1000`,
+        'GET', null, env
+      );
+      (allReports || []).forEach(r => {
+        const id = r.item_id;
+        countMap.set(id, (countMap.get(id) || 0) + 1);
+      });
+    } catch (e) {
+      console.error('report count query failed:', e.message);
+      // 统计失败不阻断主流程，所有 report_count 默认 1
+    }
+
     const data = list.map(r => {
       const it = itemMap.get(r.item_id) || {};
+      const reportCount = countMap.get(r.item_id) || 1;
+      const riskLevel = reportCount >= 3 ? 'high' : (reportCount === 2 ? 'medium' : 'normal');
       return {
         id: r.id,
         item_id: r.item_id,
@@ -1171,6 +1190,8 @@ async function handleAdminReports(request, env) {
         reviewed_at: r.reviewed_at || null,
         reviewed_by: r.reviewed_by || null,
         admin_note: r.admin_note || '',
+        report_count: reportCount,
+        risk_level: riskLevel,
       };
     });
 

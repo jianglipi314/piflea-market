@@ -121,6 +121,23 @@ async function renderReports(filter) {
         ? '<div class="mini" style="margin-top:2px">处理：' + new Date(r.reviewed_at).toLocaleString() + ' · ' + escapeHtml(r.admin_note || '') + '</div>'
         : '';
 
+      // 风险标签：high=🔴 / medium=🟡 / normal=无
+      const riskTag = r.risk_level === 'high'
+        ? '<span style="color:#e53935;font-weight:700;font-size:12px;margin-right:4px">🔴 高风险</span>'
+        : (r.risk_level === 'medium'
+          ? '<span style="color:#fb8c00;font-weight:700;font-size:12px;margin-right:4px">🟡 中风险</span>'
+          : '');
+      // 举报次数（>1 时显示）
+      const countTag = r.report_count > 1
+        ? ' · 举报 ' + r.report_count + ' 次'
+        : '';
+      // 高风险行整体边框/背景
+      const rowStyle = r.risk_level === 'high'
+        ? 'border:1px solid #e53935;background:rgba(229,57,53,0.04)'
+        : (r.risk_level === 'medium'
+          ? 'border:1px solid #fb8c00;background:rgba(251,140,0,0.04)'
+          : '');
+
       // 操作按钮：pending 显示处理/忽略/下架；非 pending 显示查看商品
       let actions = '';
       if (r.status === 'pending') {
@@ -132,12 +149,12 @@ async function renderReports(filter) {
         actions = '<button class="edit-btn" data-action="viewItem" data-id="' + r.item_id + '">查看商品</button>';
       }
 
-      return '<div class="row-item">' +
+      return '<div class="row-item" style="' + rowStyle + '">' +
         '<div class="pic" style="background:var(--bg);display:grid;place-items:center;font-size:24px">🚩</div>' +
         '<div class="txt">' +
-          '<h4>' + itemTitle + '</h4>' +
+          '<h4>' + riskTag + itemTitle + '</h4>' +
           '<div class="price" style="font-size:13px">原因：' + escapeHtml(r.reason) + '</div>' +
-          '<div class="sub">举报人: ' + reporter + itemStatus + '</div>' +
+          '<div class="sub">举报人: ' + reporter + itemStatus + countTag + '</div>' +
           '<div class="sub">' + dateStr + ' · #' + r.id + '</div>' +
           detailHtml +
           reviewedHtml +
