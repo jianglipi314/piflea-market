@@ -392,7 +392,7 @@ export function toggleAdmin() {
  * 前端管理员 UID 白名单（与 backend-worker.js 的 ADMIN_UIDS 保持一致）。
  * 用于在「我的」页面自动显示「运营后台」入口。
  */
-const ADMIN_UIDS = ['01b4a2e0-f4b9-4a68-abcf-e0b879880707'];
+const ADMIN_UIDS = ['b0e1ca76-fa58-409f-a79c-60eab2a52250'];
 
 /**
  * 判断当前 Pi 登录用户是否为管理员。

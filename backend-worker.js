@@ -112,7 +112,7 @@ const AUTH_REQUIRED_ROUTES = [
 ];
 
 // 管理员 UID 白名单
-const ADMIN_UIDS = ['01b4a2e0-f4b9-4a68-abcf-e0b879880707'];
+const ADMIN_UIDS = ['b0e1ca76-fa58-409f-a79c-60eab2a52250'];
 
 // 管理员鉴权（所有 /api/admin/* 必须调用）
 function requireAdmin(request) {
