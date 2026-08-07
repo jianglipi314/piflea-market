@@ -119,11 +119,39 @@ function ensureInit() {
 }
 
 /**
+ * 等待 window.Pi 可用（SDK 脚本可能延迟加载）。
+ * @param {number} timeoutMs 最长等待时间，默认 8 秒
+ * @returns {Promise<boolean>} true=可用，false=超时
+ */
+function waitForPiSDK(timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (typeof window.Pi !== 'undefined') {
+      resolve(true);
+      return;
+    }
+    const start = Date.now();
+    const timer = setInterval(() => {
+      if (typeof window.Pi !== 'undefined') {
+        clearInterval(timer);
+        debug('Pi SDK loaded after ' + (Date.now() - start) + 'ms');
+        resolve(true);
+      } else if (Date.now() - start >= timeoutMs) {
+        clearInterval(timer);
+        debug('Pi SDK wait timeout after ' + timeoutMs + 'ms', true);
+        resolve(false);
+      }
+    }, 200);
+  });
+}
+
+/**
  * Authenticate with Pi.
  */
 export async function authenticateWithPi() {
-  if (!window.Pi) {
-    toast('Pi SDK 不可用');
+  // 等待 SDK 加载（最多 8 秒），避免因脚本延迟报「Pi SDK 不可用」
+  const available = await waitForPiSDK();
+  if (!available) {
+    toast('Pi SDK 不可用，请检查网络后重试');
     return null;
   }
 
@@ -240,20 +268,26 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
       else reject(new Error(msg || '支付失败'));
     };
 
-    if (!window.Pi) {
-      debug('window.Pi is undefined', true);
-      toast('Pi SDK 不可用');
-      callback(false, 'Pi SDK 不可用');
-      return;
-    }
+    // 等待 SDK 加载（最多 8 秒），再执行 createPayment
+    waitForPiSDK().then((sdkReady) => {
+      if (!sdkReady) {
+        debug('window.Pi is undefined after wait', true);
+        toast('Pi SDK 不可用');
+        callback(false, 'Pi SDK 不可用');
+        return;
+      }
 
-    if (typeof window.Pi.createPayment !== 'function') {
-      debug('window.Pi.createPayment is not a function', true);
-      toast('Pi SDK createPayment 不可用');
-      callback(false, 'Pi SDK createPayment 不可用');
-      return;
-    }
+      if (typeof window.Pi.createPayment !== 'function') {
+        debug('window.Pi.createPayment is not a function', true);
+        toast('Pi SDK createPayment 不可用');
+        callback(false, 'Pi SDK createPayment 不可用');
+        return;
+      }
 
+      proceedPayment();
+    });
+
+    function proceedPayment() {
     if (!piUser) {
       debug('piUser is null, user not logged in', true);
       toast('请先登录 Pi 账号');
@@ -391,5 +425,6 @@ export function createPiPayment(amount, memo, metadata = {}, onComplete) {
       toast('Pi SDK 初始化失败：' + e.message);
       failButton('Pi SDK 初始化失败');
     });
+    } // end proceedPayment
   });
 }
