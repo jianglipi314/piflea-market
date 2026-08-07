@@ -37,7 +37,7 @@ import {
   completeOrder,
   markShipped,
 } from './views/mine';
-import { renderAdmin, adminToggleReco, adminDelete, adminLoadTransfers, adminCopyTransfer, adminConfirmTransfer } from './views/admin';
+import { renderAdmin, adminToggleReco, adminDelete } from './views/admin';
 import { openSheet, closeSheet } from './components/sheet';
 
 // ============ Create global state ============ //
@@ -92,9 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const adminBack = document.getElementById('admin-back');
   if (adminBack) adminBack.addEventListener('click', () => goto('mine'));
-
-  const adminRefreshTransfers = document.getElementById('admin-refresh-transfers');
-  if (adminRefreshTransfers) adminRefreshTransfers.addEventListener('click', () => adminLoadTransfers());
 
   const closeSheetBtn = document.getElementById('btn-close-sheet');
   if (closeSheetBtn) closeSheetBtn.addEventListener('click', () => closeSheet());
@@ -197,9 +194,6 @@ void loadOrders; void completeOrder; void markShipped; void gotoOrderDetail;
 // Admin
 window.adminToggleReco = adminToggleReco;
 window.adminDelete = adminDelete;
-window.adminLoadTransfers = adminLoadTransfers;
-window.adminCopyTransfer = adminCopyTransfer;
-window.adminConfirmTransfer = adminConfirmTransfer;
 
 // Sheet
 window.openSheet = openSheet;

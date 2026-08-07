@@ -328,22 +328,13 @@
     <div class="stat-grid">
       <div class="stat"><div class="n" id="a-items">0</div><div class="l">商品数</div></div>
       <div class="stat"><div class="n" id="a-view">0</div><div class="l">总浏览</div></div>
-      <div class="stat"><div class="n" id="a-pending">0</div><div class="l">待转账</div></div>
     </div>
     <div class="admin-tabs" id="adminTabs" style="display:flex;gap:0;border-bottom:1px solid var(--line);margin:12px 0 4px">
-      <button class="admin-tab" data-admin-tab="transfers" style="flex:1;padding:10px 6px;font-size:13px;border:none;background:transparent;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent">待转账</button>
       <button class="admin-tab" data-admin-tab="reports" style="flex:1;padding:10px 6px;font-size:13px;border:none;background:transparent;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent">举报队列</button>
       <button class="admin-tab" data-admin-tab="products" style="flex:1;padding:10px 6px;font-size:13px;border:none;background:transparent;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent">商品管理</button>
     </div>
 
-    <div id="panel-transfers" class="admin-panel">
-      <div class="section-title"><h3>待转账订单</h3><span class="sub" id="admin-refresh-transfers">刷新</span></div>
-      <div id="transferLoader" class="loading" style="display:none">加载中...</div>
-      <div class="list" id="transferList"></div>
-      <div id="transferEmpty" class="empty" style="display:none;padding:12px 0">暂无待转账订单</div>
-    </div>
-
-    <div id="panel-reports" class="admin-panel" style="display:none">
+    <div id="panel-reports" class="admin-panel">
       <div class="section-title">
         <h3>举报队列</h3>
         <span class="sub" id="admin-refresh-reports">刷新</span>
