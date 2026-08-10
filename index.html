@@ -185,8 +185,19 @@
           <input id="o-receiver-phone" type="tel" placeholder="请输入手机号" maxlength="20" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box" />
         </div>
         <div>
+          <label style="font-size:12px;color:var(--ink-2);display:block;margin-bottom:4px">所在地区 <span style="color:var(--brand);font-weight:600">*必填</span></label>
+          <div style="display:flex;gap:8px">
+            <select id="o-province" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box">
+              <option value="">省份</option>
+            </select>
+            <select id="o-city" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box">
+              <option value="">城市</option>
+            </select>
+          </div>
+        </div>
+        <div>
           <label style="font-size:12px;color:var(--ink-2);display:block;margin-bottom:4px">详细地址</label>
-          <textarea id="o-receiver-address" placeholder="省市区 + 详细地址" maxlength="200" rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+          <input id="o-receiver-address" type="text" placeholder="街道、门牌号等详细地址" maxlength="200" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box" />
         </div>
         <div>
           <label style="font-size:12px;color:var(--ink-2);display:block;margin-bottom:4px">买家备注 <span style="color:var(--ink-2);font-weight:400">（选填）</span></label>

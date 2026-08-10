@@ -1,9 +1,10 @@
-﻿﻿import { state } from '../main';
+import { state } from '../main';
 import { escapeHtml, fmtPrice, toast } from '../utils';
 import { createPiPayment, isPiAuthenticated, getPiUser } from '../pi-sdk';
 import { goto } from '../router';
 import { apiFetch, BACKEND_URL as BACKEND } from '../api';
 import { loadOrders, switchMine } from './mine';
+import { PROVINCE_CITY } from '../data/region.js';
 
 const FEE_MODE = 'A';
 const NETWORK_FEE = 0;
@@ -11,6 +12,45 @@ const PLATFORM_FEE_RATE = 0.02;
 
 let currentOrderItem = null;
 let lastPaymentId = null;
+
+/**
+ * 初始化省/市级联下拉（幂等，只填充一次省份 option）。
+ * 每次进入订单页时重置选中状态。
+ */
+function initRegionSelects() {
+  const provSelect = document.getElementById('o-province');
+  const citySelect = document.getElementById('o-city');
+  if (!provSelect || !citySelect) return;
+
+  // 首次进入：填充省份列表
+  if (!provSelect._filled) {
+    provSelect._filled = true;
+    const provinces = Object.keys(PROVINCE_CITY);
+    provinces.forEach((p) => {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = p;
+      provSelect.appendChild(opt);
+    });
+    // 级联：省份变化时重建城市列表
+    provSelect.addEventListener('change', () => {
+      const cities = PROVINCE_CITY[provSelect.value] || [];
+      citySelect.innerHTML = '<option value="">城市</option>';
+      cities.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        citySelect.appendChild(opt);
+      });
+      citySelect.value = '';
+    });
+  }
+
+  // 重置选中状态（每次进入订单页都清空）
+  provSelect.value = '';
+  citySelect.innerHTML = '<option value="">城市</option>';
+  citySelect.value = '';
+}
 
 function calcTotal(it) {
   const price = Number(it.price) || 0;
@@ -92,6 +132,10 @@ export function openOrder(id) {
   document.getElementById('o-network-fee').innerHTML = '\u{1F389} ' + fmtPrice(NETWORK_FEE) + ' \u03C0 <span style="font-size:11px;color:var(--ok)">Pi\u7F51\u7EDC\u6536\u53D6\uFF08\u4EE5\u94B1\u5305\u663E\u793A\u4E3A\u51C6\uFF09</span>';
   document.getElementById('o-total').textContent = fmtPrice(total) + ' \u03C0';
   document.getElementById('o-confirm-btn').textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+
+  // 初始化省/市级联下拉，并重置选中状态
+  initRegionSelects();
+
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -160,11 +204,16 @@ export function confirmPayment() {
     return;
   }
 
-  // 支付前校验 3：收货信息检查（姓名/手机/地址 必填，备注选填）
+  // 支付前校验 3：收货信息检查（姓名/手机/省/市/详细地址 必填，备注选填）
   const receiverName = (document.getElementById('o-receiver-name')?.value || '').trim();
   const receiverPhone = (document.getElementById('o-receiver-phone')?.value || '').trim();
-  const receiverAddress = (document.getElementById('o-receiver-address')?.value || '').trim();
+  const province = (document.getElementById('o-province')?.value || '').trim();
+  const city = (document.getElementById('o-city')?.value || '').trim();
+  const addrDetail = (document.getElementById('o-receiver-address')?.value || '').trim();
   const buyerNote = (document.getElementById('o-buyer-note')?.value || '').trim();
+
+  // 拼接完整地址字符串（省 + 市 + 详细地址）
+  const receiverAddress = [province, city, addrDetail].filter(Boolean).join(' ');
 
   if (!receiverName) {
     btn.disabled = false;
@@ -180,10 +229,24 @@ export function confirmPayment() {
     document.getElementById('o-receiver-phone')?.focus();
     return;
   }
-  if (!receiverAddress) {
+  if (!province) {
     btn.disabled = false;
     btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
-    toast('\u8BF7\u586B\u5199\u6536\u8D27\u5730\u5740');
+    toast('\u8BF7\u9009\u62E9\u7701\u4EFD');
+    document.getElementById('o-province')?.focus();
+    return;
+  }
+  if (!city) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    toast('\u8BF7\u9009\u62E9\u57CE\u5E02');
+    document.getElementById('o-city')?.focus();
+    return;
+  }
+  if (!addrDetail) {
+    btn.disabled = false;
+    btn.textContent = '\u786E\u8BA4\u652F\u4ED8 ' + fmtPrice(total) + ' \u03C0';
+    toast('\u8BF7\u586B\u5199\u8BE6\u7EC6\u5730\u5740');
     document.getElementById('o-receiver-address')?.focus();
     return;
   }
