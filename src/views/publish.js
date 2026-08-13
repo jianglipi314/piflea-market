@@ -175,6 +175,15 @@ export function initFormListener() {
       if (add) {
         e.stopPropagation();
         document.getElementById('f-files').click();
+        return;
+      }
+      // 点击已上传图片 → 全屏预览
+      const img = e.target.closest('.thumb.uploaded img');
+      if (img) {
+        e.stopPropagation();
+        const parent = img.closest('.thumb.uploaded');
+        const idx = parent ? Number(parent.querySelector('[data-remove]')?.dataset.remove) : -1;
+        if (idx >= 0) openImagePreview(idx);
       }
     });
   }
@@ -294,6 +303,22 @@ function renderUploader() {
 export function removeImg(i) {
   uploadImages.splice(i, 1);
   renderUploader();
+}
+
+/**
+ * Open full-screen image preview for publish thumbnails.
+ */
+function openImagePreview(idx) {
+  const overlay = document.createElement('div');
+  overlay.className = 'image-overlay';
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  const img = document.createElement('img');
+  img.src = uploadImages[idx];
+  img.alt = '';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
 }
 
 /**

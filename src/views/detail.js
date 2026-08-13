@@ -11,6 +11,90 @@ import { getPiUser } from '../pi-sdk';
 let heroImgIdx = 0;
 
 /**
+ * Full-screen image lightbox with swipe support.
+ * @param {string[]} images - Array of image URLs
+ * @param {number} startIdx - Starting image index
+ */
+function showImageLightbox(images, startIdx) {
+  let currentIdx = startIdx;
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'image-overlay';
+
+  // 图片
+  const img = document.createElement('img');
+  img.src = images[currentIdx];
+  img.alt = '';
+  overlay.appendChild(img);
+
+  // 计数
+  const count = document.createElement('div');
+  count.className = 'overlay-count';
+  count.textContent = `${currentIdx + 1} / ${images.length}`;
+  overlay.appendChild(count);
+
+  function updateImage() {
+    img.src = images[currentIdx];
+    img.style.opacity = '0';
+    requestAnimationFrame(() => { img.style.opacity = '1'; });
+    count.textContent = `${currentIdx + 1} / ${images.length}`;
+  }
+
+  // 触摸滑动
+  overlay.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  overlay.addEventListener('touchend', (e) => {
+    const dx = touchStartX - e.changedTouches[0].clientX;
+    const dy = touchStartY - e.changedTouches[0].clientY;
+    // 只处理水平滑动，忽略垂直滑动
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0 && currentIdx < images.length - 1) {
+        currentIdx++;
+        updateImage();
+      } else if (dx < 0 && currentIdx > 0) {
+        currentIdx--;
+        updateImage();
+      }
+    }
+  }, { passive: true });
+
+  // 点击背景关闭
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  // 键盘左右键切换
+  function onKeydown(e) {
+    if (e.key === 'ArrowRight' && currentIdx < images.length - 1) {
+      currentIdx++;
+      updateImage();
+    } else if (e.key === 'ArrowLeft' && currentIdx > 0) {
+      currentIdx--;
+      updateImage();
+    } else if (e.key === 'Escape') {
+      overlay.remove();
+    }
+  }
+  document.addEventListener('keydown', onKeydown);
+
+  // 移除时清理
+  overlay._cleanup = () => document.removeEventListener('keydown', onKeydown);
+
+  const origRemove = overlay.remove.bind(overlay);
+  overlay.remove = () => {
+    if (overlay._cleanup) overlay._cleanup();
+    origRemove();
+  };
+
+  document.body.appendChild(overlay);
+}
+
+/**
  * Bind detail view action buttons (idempotent via flags).
  * Replaces inline onclick handlers for Pi Browser compatibility.
  */
@@ -288,12 +372,19 @@ export async function openDetail(id) {
     }
   };
 
-  // Click to go to next image (fallback when swipe doesn't work)
+  // Click image → open lightbox; click elsewhere → keep as fallback nav
   hero.onclick = (e) => {
     if (!it.images || !it.images.length) return;
     const tg = e.target.closest ? (e.target.closest('.back') || e.target.closest('.share')) : null;
     if (tg) return;
     if (e.target.tagName === 'BUTTON') return;
+    // Click on image → open full-screen lightbox
+    if (e.target.tagName === 'IMG' && e.target.closest('.hero-gallery')) {
+      e.stopPropagation();
+      showImageLightbox(it.images, heroImgIdx);
+      return;
+    }
+    // Click on non-image area → rotate to next image (fallback)
     heroImgIdx = (heroImgIdx + 1) % it.images.length;
     gallery.scrollTo({ left: heroImgIdx * gallery.offsetWidth, behavior: 'smooth' });
   };
