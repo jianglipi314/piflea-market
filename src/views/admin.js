@@ -114,7 +114,7 @@ async function renderReports(filter) {
       const reporter = (r.reporter_uid || '').slice(0, 8) + '...';
       const dateStr = r.created_at ? new Date(r.created_at).toLocaleString() : '';
       const itemTitle = escapeHtml(r.item_title || '(商品已删除)');
-      const itemStatus = r.item_status === 'blocked' ? ' · 🚫已下架' : (r.item_status === 'sold' ? ' · 已售' : '');
+      const itemStatus = r.item_status === 'blocked' ? ' · 🚫已下架' : (r.item_status === 'sold' ? ' · 已售' : (r.item_status === 'pending' ? ' · 交易中' : ''));
       const detailHtml = r.detail ? '<div class="mini" style="margin-top:2px">补充：' + escapeHtml(r.detail) + '</div>' : '';
       const reviewedHtml = r.reviewed_at
         ? '<div class="mini" style="margin-top:2px">处理：' + new Date(r.reviewed_at).toLocaleString() + ' · ' + escapeHtml(r.admin_note || '') + '</div>'
@@ -305,7 +305,7 @@ export async function renderAdmin() {
           <h4>${escapeHtml(d.title)}</h4>
           <div class="price">${fmtPrice(d.price)} π</div>
           <div class="sub">👁 ${d.views || 0} · ${escapeHtml(d.seller || '')} · #${d.id}</div>
-          <div class="mini">推荐: ${d.tpl || '—'} · ${d.status === 'blocked' ? '🚫 已下架' : (d.status === 'sold' ? '已售' : '在售')}</div>
+          <div class="mini">推荐: ${d.tpl || '—'} · ${d.status === 'blocked' ? '🚫 已下架' : (d.status === 'sold' ? '已售' : (d.status === 'pending' ? '⏳ 交易中' : '在售'))}</div>
         </div>
         <div class="row-actions">
           <button class="edit-btn" data-action="toggleReco" data-id="${d.id}">切换推荐</button>

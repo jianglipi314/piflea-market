@@ -260,7 +260,7 @@ export function switchMine(tab) {
                   : it.emoji
               }</div>
               <div class="txt">
-                <h4>${escapeHtml(it.title)} ${it.status === 'sold' ? '<span class="mini" style="color:#64748b">已售</span>' : '<span class="mini" style="color:var(--ok)">在售</span>'}</h4>
+                <h4>${escapeHtml(it.title)} ${it.status === 'sold' ? '<span class="mini" style="color:#64748b">已售</span>' : it.status === 'pending' ? '<span class="mini" style="color:#f59e0b">交易中</span>' : '<span class="mini" style="color:var(--ok)">在售</span>'}</h4>
                 <div class="price">${fmtPrice(it.price)} π</div>
                 <div class="sub">📂 ${it.category || ''} · 👁 ${it.views || 0} · ♥ ${it.fav_count || 0} · 📅 ${it.created_at ? new Date(it.created_at).toLocaleDateString() : ''}</div>
               </div>
@@ -268,6 +268,8 @@ export function switchMine(tab) {
                 <button class="edit-btn" data-action="edit" data-id="${it.id}">编辑</button>
                 ${it.status === 'sold'
                   ? `<button class="rm" data-action="unsetSold" data-id="${it.id}">恢复在售</button>`
+                  : it.status === 'pending'
+                  ? ''
                   : `<button class="edit-btn" data-action="markSold" data-id="${it.id}">标记已售</button>`
                 }
                 <button class="rm" data-action="deleteItem" data-id="${it.id}">删除</button>

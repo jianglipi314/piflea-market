@@ -29,6 +29,7 @@ export function cardHTML(it) {
   const badges = [];
   if (it.tpl === 'reco') badges.push('<span class="badge">🔥 推荐</span>');
   if (it.status === 'sold') badges.push('<span class="badge" style="background:rgba(100,116,139,.95)">已售</span>');
+  if (it.status === 'pending') badges.push('<span class="badge" style="background:rgba(245,158,11,.95)">交易中</span>');
   if (it.city) badges.push('<span class="badge verify">认证</span>');
 
   // 元信息片段：按需拼接，空值不显示

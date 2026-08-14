@@ -186,6 +186,30 @@ async function supabaseRequest(path, method, body, env) {
   return null;
 }
 
+/**
+ * Conditional PATCH with return=representation.
+ * Necessary for atomic operations where we need to know if 0 or 1 row was updated.
+ * @returns {Promise<Array>} Updated rows (empty array = 0 rows affected).
+ */
+async function supabaseConditionalPatch(path, body, env) {
+  const url = `${env.SUPABASE_URL}/rest/v1${path}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'apikey': env.SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase ${path} failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
 // ============ 状态兼容工具 ============
 // 现有订单 status 可能是 'paid'，新逻辑用 'completed'
 // 查询时兼容两者，更新时统一用 'completed'
@@ -445,6 +469,49 @@ async function handleApprove(request, env) {
       return errorResponse('Product unavailable', 400, 'product_unavailable', env);
     }
 
+    // 3b. 原子并发锁：只有 status=active 时才能锁定为 pending（防止并发购买）
+    const lockResult = await supabaseConditionalPatch(
+      `/items?id=eq.${productId}&status=eq.active`,
+      { status: 'pending', updated_at: new Date().toISOString() },
+      env
+    );
+    if (!lockResult || lockResult.length === 0) {
+      console.error('SECURITY: Concurrent purchase blocked', {
+        paymentId,
+        productId,
+        lockResult,
+      });
+      await debugApproveError('concurrent_purchase', 'Product is no longer available', {
+        paymentId,
+        productId,
+      });
+      return errorResponse('Product is no longer available', 400, 'product_unavailable', env);
+    }
+
+    // 已锁定为 pending，后续任何错误都需要回滚
+    async function rollbackItemLock() {
+      try {
+        const rollbackResult = await supabaseConditionalPatch(
+          `/items?id=eq.${productId}&status=eq.pending`,
+          { status: 'active', updated_at: new Date().toISOString() },
+          env
+        );
+        if (!rollbackResult || rollbackResult.length === 0) {
+          console.error('Failed to rollback item status (pending→active)', {
+            paymentId,
+            productId,
+            rollbackResult,
+          });
+        }
+      } catch (rollbackErr) {
+        console.error('Exception rolling back item status', {
+          paymentId,
+          productId,
+          error: rollbackErr.message,
+        });
+      }
+    }
+
     // 4. 验证 seller_id 一致性
     if (item.owner_id && piMeta.sellerId && item.owner_id !== piMeta.sellerId) {
       console.error('SECURITY: Seller mismatch', {
@@ -452,6 +519,7 @@ async function handleApprove(request, env) {
         itemOwner: item.owner_id,
         metaSellerId: piMeta.sellerId,
       });
+      await rollbackItemLock();
       await debugApproveError('seller_mismatch', 'Seller mismatch', {
         paymentId,
         productId,
@@ -471,6 +539,7 @@ async function handleApprove(request, env) {
     // 6. Pi amount 有效性检查（禁止 0 金额订单）
     if (!piAmount || piAmount <= 0) {
       console.error('SECURITY: Invalid payment amount', { paymentId, piAmount });
+      await rollbackItemLock();
       await debugApproveError('invalid_amount', 'Invalid payment amount', {
         paymentId,
         piAmount,
@@ -506,6 +575,7 @@ async function handleApprove(request, env) {
         shippingFee: shippingFeeSnapshot,
         productId,
       });
+      await rollbackItemLock();
       await debugApproveError('amount_mismatch',
         `Payment amount ${piAmount} does not match expected ${expectedAmount}`,
         {
@@ -534,6 +604,7 @@ async function handleApprove(request, env) {
       payment_id: paymentId,
       order_no: generateOrderNo(),
       product_id: productId,
+      item_id: productId,
       buyer_id: piMeta.buyerId || body.buyerId || null,
       seller_id: piMeta.sellerId || body.sellerId || null,
       item_title: piMeta.itemTitle || body.itemTitle || '',
@@ -575,6 +646,7 @@ async function handleApprove(request, env) {
           body,
           piMeta,
         });
+        await rollbackItemLock();
         await debugApproveError('missing_identity', 'Missing buyer or seller identity', {
           paymentId,
           finalBuyerId,
@@ -617,6 +689,8 @@ async function handleApprove(request, env) {
           error: updateErr.message,
         });
       }
+      // 回滚商品状态：pending → active
+      await rollbackItemLock();
       throw approveErr;
     }
 
@@ -735,6 +809,30 @@ async function handleComplete(request, env) {
     if (!existing.item_title && completeMeta.itemTitle) updates.item_title = completeMeta.itemTitle;
 
     await updateOrder(paymentId, updates, env);
+
+    // 更新商品状态为已售（pending → sold）
+    if (existing.product_id) {
+      try {
+        const soldResult = await supabaseConditionalPatch(
+          `/items?id=eq.${existing.product_id}&status=eq.pending`,
+          { status: 'sold', updated_at: new Date().toISOString() },
+          env
+        );
+        if (!soldResult || soldResult.length === 0) {
+          console.error('Failed to update item status to sold (0 rows affected)', {
+            paymentId,
+            product_id: existing.product_id,
+            item_status_expected: 'pending',
+          });
+        }
+      } catch (soldErr) {
+        console.error('Exception updating item status to sold', {
+          paymentId,
+          product_id: existing.product_id,
+          error: soldErr.message,
+        });
+      }
+    }
 
     return jsonResponse({
       success: true,

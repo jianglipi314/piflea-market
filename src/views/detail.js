@@ -258,6 +258,9 @@ export async function openDetail(id) {
   } else if (it.status === 'blocked') {
     statusTag.textContent = '🚫 已下架';
     statusTag.className = 'status-tag sold';
+  } else if (it.status === 'pending') {
+    statusTag.textContent = '⏳ 交易中';
+    statusTag.className = 'status-tag';
   } else {
     statusTag.textContent = '✓ 在售';
     statusTag.className = 'status-tag';
@@ -320,7 +323,8 @@ export async function openDetail(id) {
       `<img src="${src}" decoding="async" style="min-width:100%;object-fit:cover;display:block" data-idx="${i}"/>`
     ).join('');
     gallery.style.display = 'flex';
-    gallery.style.overflow = 'hidden';
+    gallery.style.overflowX = 'auto';
+    gallery.style.overflowY = 'hidden';
     gallery.style.scrollSnapType = 'x mandatory';
     gallery.style.width = '100%';
     gallery.style.height = '100%';
@@ -424,6 +428,10 @@ export async function openDetail(id) {
     buyBtn.style.opacity = '0.6';
   } else if (it.status === 'blocked') {
     buyBtn.textContent = '🚫 商品已下架';
+    buyBtn.disabled = true;
+    buyBtn.style.opacity = '0.6';
+  } else if (it.status === 'pending') {
+    buyBtn.textContent = '⏳ 交易中';
     buyBtn.disabled = true;
     buyBtn.style.opacity = '0.6';
   } else {
