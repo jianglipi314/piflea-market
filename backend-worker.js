@@ -472,7 +472,7 @@ async function handleApprove(request, env) {
     // 3b. 原子并发锁：只有 status=active 时才能锁定为 pending（防止并发购买）
     const lockResult = await supabaseConditionalPatch(
       `/items?id=eq.${productId}&status=eq.active`,
-      { status: 'pending', updated_at: new Date().toISOString() },
+      { status: 'pending' },
       env
     );
     if (!lockResult || lockResult.length === 0) {
@@ -493,7 +493,7 @@ async function handleApprove(request, env) {
       try {
         const rollbackResult = await supabaseConditionalPatch(
           `/items?id=eq.${productId}&status=eq.pending`,
-          { status: 'active', updated_at: new Date().toISOString() },
+          { status: 'active' },
           env
         );
         if (!rollbackResult || rollbackResult.length === 0) {
@@ -815,7 +815,7 @@ async function handleComplete(request, env) {
       try {
         const soldResult = await supabaseConditionalPatch(
           `/items?id=eq.${existing.product_id}&status=eq.pending`,
-          { status: 'sold', updated_at: new Date().toISOString() },
+          { status: 'sold' },
           env
         );
         if (!soldResult || soldResult.length === 0) {
