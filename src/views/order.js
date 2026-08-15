@@ -139,39 +139,6 @@ export function openOrder(id) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
-async function createOrder(paymentId, txid) {
-  const item = currentOrderItem;
-  const user = getPiUser();
-  if (!item || !user) return;
-  // 防止取消/失败时误创建订单
-  if (!paymentId || !txid) {
-    console.warn('[createOrder] missing paymentId or txid, aborting');
-    return;
-  }
-
-  const sellerId = item.owner_id || 'seller_' + (item.seller || 'unknown');
-  const buyerId = user.uid || '';
-
-  try {
-    await apiFetch('/api/create-order', {
-      method: 'POST',
-      body: JSON.stringify({
-        payment_id: paymentId,
-        txid: txid || '',
-        buyer_id: buyerId,
-        seller_id: sellerId,
-        item_id: item.id,
-        item_title: item.title || '',
-        item_price: item.price || 0,
-        amount: calcTotal(item).total,
-        memo: 'Piflea: ' + (item.title || '')
-      })
-    });
-  } catch (e) {
-    console.error('Create order failed:', e);
-  }
-}
-
 export function confirmPayment() {
   if (!currentOrderItem) { toast('\u8BA2\u5355\u4FE1\u606F\u4E22\u5931'); return; }
   if (!window.Pi) {

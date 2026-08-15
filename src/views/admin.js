@@ -369,12 +369,14 @@ export async function adminToggleReco(id) {
   const newTpl = it.tpl === 'reco' ? '' : 'reco';
 
   try {
-    const supabase = getSupabase();
-    const { error } = await supabase
-      .from('items')
-      .update({ tpl: newTpl })
-      .eq('id', id);
-    if (error) throw error;
+    const res = await apiFetch('/api/admin/items/toggle-reco', {
+      method: 'POST',
+      body: JSON.stringify({ itemId: id }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || '请求失败');
+    }
     it.tpl = newTpl;
     toast(newTpl ? '✅ 已设为推荐' : '已取消推荐');
     renderAdmin();
@@ -390,9 +392,14 @@ export async function adminDelete(id) {
   if (!confirm('确定要删除该商品（ID: ' + id + '）吗？')) return;
 
   try {
-    const supabase = getSupabase();
-    const { error } = await supabase.from('items').delete().eq('id', id);
-    if (error) throw error;
+    const res = await apiFetch('/api/admin/items/delete', {
+      method: 'POST',
+      body: JSON.stringify({ itemId: id }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || '请求失败');
+    }
     state.items = state.items.filter((x) => x.id !== id);
     toast('已删除');
     renderAdmin();

@@ -4,6 +4,7 @@ import { getSupabase } from '../supabase';
 import { state } from '../main';
 import { CAT_ICON, LOC_KEY } from '../state';
 import { getPiUser } from '../pi-sdk';
+import { apiFetch } from '../api';
 import { escapeHtml, fmtPrice, toast, getCurrentUserId, getAllMyUserIds } from '../utils';
 import { goto } from '../router';
 import { PROVINCE_CITY } from '../data/region.js';
@@ -436,15 +437,16 @@ export async function doPublish(ev) {
 
 async function submitItem(data) {
   const btn = document.getElementById('f-submit');
-  const supabase = getSupabase();
   const isEdit = !!state.editId;
   btn.textContent = isEdit ? '保存修改中...' : '保存到云端...';
 
   let result, error;
   if (isEdit) {
-    ({ data: result, error } = await supabase
-      .from('items')
-      .update({
+    // 通过 Worker API 更新（安全：服务端验证 owner_id）
+    const res = await apiFetch('/api/items/update', {
+      method: 'POST',
+      body: JSON.stringify({
+        itemId: state.editId,
         title: data.title,
         price: data.price,
         category: data.cat,
@@ -454,14 +456,18 @@ async function submitItem(data) {
         contact: data.contact || '',
         shipping_fee: data.shipping_fee || 0,
         images: data.images,
-      })
-      .eq('id', state.editId)
-      .select()
-      .single());
+      }),
+    });
+    if (!res.ok) {
+      error = { message: (await res.json().catch(() => ({}))).message || '保存失败' };
+    } else {
+      result = { id: state.editId };
+    }
   } else {
-    ({ data: result, error } = await supabase
-      .from('items')
-      .insert({
+    // 通过 Worker API 创建（安全：owner_id 由服务端强制写入）
+    const res = await apiFetch('/api/items/create', {
+      method: 'POST',
+      body: JSON.stringify({
         title: data.title,
         price: data.price,
         category: data.cat,
@@ -471,13 +477,13 @@ async function submitItem(data) {
         contact: data.contact || '',
         shipping_fee: data.shipping_fee || 0,
         images: data.images,
-        views: 0,
-        fav_count: 0,
-        status: 'active',
-        owner_id: data.owner_id,
-      })
-      .select()
-      .single());
+      }),
+    });
+    if (!res.ok) {
+      error = { message: (await res.json().catch(() => ({}))).message || '发布失败' };
+    } else {
+      result = await res.json().catch(() => ({}));
+    }
   }
 
   if (error) {

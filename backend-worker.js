@@ -90,11 +90,10 @@ async function verifyPiToken(request, env) {
 
 // 需要鉴权的路由列表
 const AUTH_REQUIRED_ROUTES = [
+  '/api/approve',
   '/api/transfer-to-seller',
   '/api/mark-shipped',
   '/api/my-orders',
-  '/api/complete-order',
-  '/api/create-order',
   // 收藏 API：身份从 Authorization Bearer token 获取，禁止前端传 userUid
   '/api/favorite',
   '/api/unfavorite',
@@ -102,11 +101,19 @@ const AUTH_REQUIRED_ROUTES = [
   '/api/favorite-check',
   // 举报 API：身份从 Authorization Bearer token 获取，禁止前端传 reporter_uid
   '/api/report',
+  // 商品写操作 API：身份从 Pi token 获取，handler 内校验 owner_id
+  '/api/items/create',
+  '/api/items/update',
+  '/api/items/mark-sold',
+  '/api/items/unset-sold',
+  '/api/items/delete',
   // 管理员 API：所有 /api/admin/* 都需要 Pi token 解析 uid，handler 内再校验 ADMIN_UIDS
   '/api/admin/reports',
   '/api/admin/reports/review',
   '/api/admin/items/block',
   '/api/admin/items/unblock',
+  '/api/admin/items/toggle-reco',
+  '/api/admin/items/delete',
   '/api/admin/pending-transfers',
   '/api/admin/confirm-transfer',
 ];
@@ -163,12 +170,10 @@ async function piPlatformRequestRaw(path, method = 'GET', body = null, env, netw
 
 async function supabaseRequest(path, method, body, env) {
   const supabaseUrl = env.SUPABASE_URL;
-  const supabaseAnonKey = env.SUPABASE_ANON_KEY;
   const supabaseKey = env.SUPABASE_KEY;
   const url = `${supabaseUrl}/rest/v1${path}`;
   const headers = {
-    'apikey': supabaseAnonKey,
-    'Authorization': `Bearer ${supabaseKey}`,
+    'apikey': supabaseKey,
     'Content-Type': 'application/json',
     'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal',
   };
@@ -196,8 +201,7 @@ async function supabaseConditionalPatch(path, body, env) {
   const res = await fetch(url, {
     method: 'PATCH',
     headers: {
-      'apikey': env.SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${env.SUPABASE_KEY}`,
+      'apikey': env.SUPABASE_KEY,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
     },
@@ -387,6 +391,25 @@ async function handleApprove(request, env) {
       userUid: piData.user?.uid,
       full_payment: JSON.stringify(payment).slice(0, 1500),
     }));
+
+    // ===== 身份验证：token UID 必须与 payment metadata 中的 buyerId 一致 =====
+    const tokenUid = request.piUser && request.piUser.uid;
+    const metaBuyerId = piMeta.buyerId || body.buyerId || null;
+    if (tokenUid && metaBuyerId && tokenUid !== metaBuyerId) {
+      console.error('SECURITY: Token UID mismatch with buyerId', {
+        paymentId,
+        tokenUid,
+        metaBuyerId,
+      });
+      await debugApproveError('identity_mismatch', 'Token UID does not match buyer identity', {
+        paymentId,
+        tokenUid,
+        metaBuyerId,
+        piMeta_buyerId: piMeta.buyerId,
+        body_buyerId: body.buyerId,
+      });
+      return errorResponse('Identity mismatch: token UID does not match buyer', 403, 'identity_mismatch', env);
+    }
 
     // ===== 资金安全校验：商品金额快照 =====
     const productId = piMeta.itemId || piMeta.productId || body.itemId || null;
@@ -1432,35 +1455,212 @@ async function handleAdminConfirmTransfer(request, env) {
   }
 }
 
-// 7. POST /api/complete-order - 买家确认收货
-async function handleCompleteOrder(request, env) {
+// ============ 商品安全 API（替代前端直接 Supabase 写操作）============
+
+// POST /api/items/view - 浏览计数 +1（不要求登录）
+async function handleItemsView(request, env) {
   try {
-    const { order_id, buyer_id } = await request.json();
-    if (!order_id || !buyer_id) {
-      return errorResponse('order_id and buyer_id required', 400, 'missing_params', env);
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return errorResponse('itemId required', 400, 'missing_params', env);
     }
-
-    const orders = await supabaseRequest(
-      `/orders?id=eq.${order_id}&buyer_id=eq.${encodeURIComponent(buyer_id)}&limit=1`,
-      'GET', null, env
-    );
-    if (!orders || !orders.length) {
-      return errorResponse('Order not found', 404, 'not_found', env);
-    }
-
-    await supabaseRequest(
-      `/orders?id=eq.${order_id}`,
-      'PATCH', { status: 'completed', updated_at: new Date().toISOString() }, env
-    );
-
-    return jsonResponse({ success: true, message: 'Order completed' }, 200, env);
+    // 使用 rpc 调用或直接 PATCH，但禁止客户端指定最终值
+    // 先查询当前 views，再 +1
+    const items = await supabaseRequest(`/items?id=eq.${itemId}&select=views&limit=1`, 'GET', null, env);
+    const currentViews = (items && items.length > 0) ? (parseInt(items[0].views) || 0) : 0;
+    await supabaseRequest(`/items?id=eq.${itemId}`, 'PATCH', { views: currentViews + 1 }, env);
+    return jsonResponse({ success: true, views: currentViews + 1 }, 200, env);
   } catch (err) {
-    console.error('complete-order error:', err);
+    console.error('/api/items/view error:', err);
     return errorResponse(err.message, 500, 'internal_error', env);
   }
 }
 
-// 7. POST /api/mark-shipped - 卖家标记发货
+// POST /api/items/create - 发布商品（必须 Pi token，owner_id 强制写入）
+async function handleItemsCreate(request, env) {
+  try {
+    const uid = request.piUser.uid;
+    const body = await request.json();
+    // 字段白名单：只允许这些字段
+    const allowedFields = ['title', 'description', 'price', 'shipping_fee', 'category', 'city', 'images', 'contact', 'seller_name'];
+    const itemData = { owner_id: uid, status: 'active', created_at: new Date().toISOString(), views: 0 };
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) {
+        itemData[key] = body[key];
+      }
+    }
+    // 禁止客户端指定 owner_id
+    if (body.owner_id && body.owner_id !== uid) {
+      console.error('SECURITY: Client attempted to set owner_id different from token UID', { body_owner_id: body.owner_id, token_uid: uid });
+      return errorResponse('Cannot set owner_id', 403, 'forbidden', env);
+    }
+    const result = await supabaseRequest('/items', 'POST', itemData, env);
+    return jsonResponse({ success: true, data: result }, 201, env);
+  } catch (err) {
+    console.error('/api/items/create error:', err);
+    return errorResponse(err.message, 500, 'internal_error', env);
+  }
+}
+
+// POST /api/items/update - 编辑商品（必须 Pi token，验证 owner_id）
+async function handleItemsUpdate(request, env) {
+  try {
+    const uid = request.piUser.uid;
+    const body = await request.json();
+    const { itemId } = body;
+    if (!itemId) {
+      return errorResponse('itemId required', 400, 'missing_params', env);
+    }
+    // 验证所有权
+    const items = await supabaseRequest(`/items?id=eq.${itemId}&select=owner_id&limit=1`, 'GET', null, env);
+    if (!items || !items.length) {
+      return errorResponse('Item not found', 404, 'not_found', env);
+    }
+    if (items[0].owner_id !== uid) {
+      console.error('SECURITY: Non-owner attempted to update item', { itemId, token_uid: uid, owner_id: items[0].owner_id });
+      return errorResponse('Not your item', 403, 'forbidden', env);
+    }
+    // 字段白名单（禁止修改 id、owner_id、price、status、views、created_at）
+    const allowedFields = ['title', 'description', 'shipping_fee', 'category', 'city', 'images', 'contact', 'seller_name'];
+    const updateData = { updated_at: new Date().toISOString() };
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) {
+        updateData[key] = body[key];
+      }
+    }
+    await supabaseRequest(`/items?id=eq.${itemId}`, 'PATCH', updateData, env);
+    return jsonResponse({ success: true }, 200, env);
+  } catch (err) {
+    console.error('/api/items/update error:', err);
+    return errorResponse(err.message, 500, 'internal_error', env);
+  }
+}
+
+// POST /api/items/mark-sold - 标记已售（必须 Pi token，验证 owner_id，仅 active→sold）
+async function handleItemsMarkSold(request, env) {
+  try {
+    const uid = request.piUser.uid;
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return errorResponse('itemId required', 400, 'missing_params', env);
+    }
+    // 验证所有权 + 当前状态
+    const items = await supabaseRequest(`/items?id=eq.${itemId}&select=owner_id,status&limit=1`, 'GET', null, env);
+    if (!items || !items.length) {
+      return errorResponse('Item not found', 404, 'not_found', env);
+    }
+    const item = items[0];
+    if (item.owner_id !== uid) {
+      console.error('SECURITY: Non-owner attempted to mark-sold', { itemId, token_uid: uid, owner_id: item.owner_id });
+      return errorResponse('Not your item', 403, 'forbidden', env);
+    }
+    if (item.status !== 'active') {
+      return errorResponse(`Item status is '${item.status}', must be 'active'`, 400, 'invalid_status', env);
+    }
+    await supabaseRequest(`/items?id=eq.${itemId}`, 'PATCH', { status: 'sold' }, env);
+    return jsonResponse({ success: true }, 200, env);
+  } catch (err) {
+    console.error('/api/items/mark-sold error:', err);
+    return errorResponse(err.message, 500, 'internal_error', env);
+  }
+}
+
+// POST /api/items/unset-sold - 恢复在售（必须 Pi token，验证 owner_id，仅 sold→active）
+async function handleItemsUnsetSold(request, env) {
+  try {
+    const uid = request.piUser.uid;
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return errorResponse('itemId required', 400, 'missing_params', env);
+    }
+    const items = await supabaseRequest(`/items?id=eq.${itemId}&select=owner_id,status&limit=1`, 'GET', null, env);
+    if (!items || !items.length) {
+      return errorResponse('Item not found', 404, 'not_found', env);
+    }
+    const item = items[0];
+    if (item.owner_id !== uid) {
+      console.error('SECURITY: Non-owner attempted to unset-sold', { itemId, token_uid: uid, owner_id: item.owner_id });
+      return errorResponse('Not your item', 403, 'forbidden', env);
+    }
+    if (item.status !== 'sold') {
+      return errorResponse(`Item status is '${item.status}', must be 'sold'`, 400, 'invalid_status', env);
+    }
+    await supabaseRequest(`/items?id=eq.${itemId}`, 'PATCH', { status: 'active' }, env);
+    return jsonResponse({ success: true }, 200, env);
+  } catch (err) {
+    console.error('/api/items/unset-sold error:', err);
+    return errorResponse(err.message, 500, 'internal_error', env);
+  }
+}
+
+// POST /api/items/delete - 删除商品（必须 Pi token，验证 owner_id）
+async function handleItemsDelete(request, env) {
+  try {
+    const uid = request.piUser.uid;
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return errorResponse('itemId required', 400, 'missing_params', env);
+    }
+    const items = await supabaseRequest(`/items?id=eq.${itemId}&select=owner_id&limit=1`, 'GET', null, env);
+    if (!items || !items.length) {
+      return errorResponse('Item not found', 404, 'not_found', env);
+    }
+    if (items[0].owner_id !== uid) {
+      console.error('SECURITY: Non-owner attempted to delete item', { itemId, token_uid: uid, owner_id: items[0].owner_id });
+      return errorResponse('Not your item', 403, 'forbidden', env);
+    }
+    await supabaseRequest(`/items?id=eq.${itemId}`, 'DELETE', null, env);
+    return jsonResponse({ success: true }, 200, env);
+  } catch (err) {
+    console.error('/api/items/delete error:', err);
+    return errorResponse(err.message, 500, 'internal_error', env);
+  }
+}
+
+// ============ 管理员商品 API ============
+
+// POST /api/admin/items/toggle-reco - 切换推荐状态（管理员）
+async function handleAdminItemsToggleReco(request, env) {
+  if (!requireAdmin(request)) {
+    return errorResponse('Admin only', 403, 'forbidden', env);
+  }
+  try {
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return errorResponse('itemId required', 400, 'missing_params', env);
+    }
+    const items = await supabaseRequest(`/items?id=eq.${itemId}&select=tpl&limit=1`, 'GET', null, env);
+    if (!items || !items.length) {
+      return errorResponse('Item not found', 404, 'not_found', env);
+    }
+    const newTpl = items[0].tpl === 'reco' ? '' : 'reco';
+    await supabaseRequest(`/items?id=eq.${itemId}`, 'PATCH', { tpl: newTpl }, env);
+    return jsonResponse({ success: true, tpl: newTpl }, 200, env);
+  } catch (err) {
+    console.error('/api/admin/items/toggle-reco error:', err);
+    return errorResponse(err.message, 500, 'internal_error', env);
+  }
+}
+
+// POST /api/admin/items/delete - 删除商品（管理员）
+async function handleAdminItemsDelete(request, env) {
+  if (!requireAdmin(request)) {
+    return errorResponse('Admin only', 403, 'forbidden', env);
+  }
+  try {
+    const { itemId } = await request.json();
+    if (!itemId) {
+      return errorResponse('itemId required', 400, 'missing_params', env);
+    }
+    await supabaseRequest(`/items?id=eq.${itemId}`, 'DELETE', null, env);
+    return jsonResponse({ success: true }, 200, env);
+  } catch (err) {
+    console.error('/api/admin/items/delete error:', err);
+    return errorResponse(err.message, 500, 'internal_error', env);
+  }
+}
+
+// POST /api/mark-shipped - 卖家标记发货
 async function handleMarkShipped(request, env) {
   try {
     const { order_id, shipping_company, tracking_no } = await request.json();
@@ -1494,55 +1694,6 @@ async function handleMarkShipped(request, env) {
     return jsonResponse({ success: true, message: 'Order marked as shipped', shipping_company, tracking_no }, 200, env);
   } catch (err) {
     console.error('mark-shipped error:', err);
-    return errorResponse(err.message, 500, 'internal_error', env);
-  }
-}
-
-// 8. POST /api/create-order - 前端创建订单（防御性去重：payment_id 已存在则直接返回）
-async function handleCreateOrder(request, env) {
-  try {
-    const body = await request.json();
-    const { payment_id, txid, buyer_id, seller_id, item_id, item_title, item_price, amount, memo,
-            receiverName, receiverPhone, receiverAddress, buyerNote } = body;
-
-    // 去重保护：同一 payment_id 已有订单则直接返回，避免重复写入导致状态被覆盖
-    if (payment_id) {
-      const existing = await getOrderByPaymentId(payment_id, env);
-      if (existing) {
-        return jsonResponse({
-          success: true,
-          message: 'Order already exists',
-          order_id: existing.id,
-          status: existing.status,
-        }, 200, env);
-      }
-    }
-
-    const orderData = {
-      payment_id: payment_id || null,
-      buyer_id: buyer_id,
-      seller_id: seller_id,
-      product_id: item_id,
-      item_title: item_title || '',
-      item_price: item_price || 0,
-      amount: amount || 0,
-      memo: memo || '',
-      // 收货信息（兼容字段，前端当前不调用此接口）
-      receiver_name: receiverName || null,
-      receiver_phone: receiverPhone || null,
-      receiver_address: receiverAddress || null,
-      buyer_note: buyerNote || null,
-      status: 'pending',
-      txid: txid || null,
-      cancelled: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    await createOrder(orderData, env);
-    return jsonResponse({ success: true, message: 'Order created' }, 200, env);
-  } catch (err) {
-    console.error('create-order error:', err);
     return errorResponse(err.message, 500, 'internal_error', env);
   }
 }
@@ -2009,10 +2160,20 @@ export default {
         case '/api/incomplete':
         case '/payments/incomplete':
           return await handleIncomplete(request, env);
-        case '/api/create-order':
-          return await handleCreateOrder(request, env);
-        case '/api/complete-order':
-          return await handleCompleteOrder(request, env);
+        // 商品浏览计数（不要求登录）
+        case '/api/items/view':
+          return await handleItemsView(request, env);
+        // 商品安全 API（需要 Pi token，handler 内校验 owner_id）
+        case '/api/items/create':
+          return await handleItemsCreate(request, env);
+        case '/api/items/update':
+          return await handleItemsUpdate(request, env);
+        case '/api/items/mark-sold':
+          return await handleItemsMarkSold(request, env);
+        case '/api/items/unset-sold':
+          return await handleItemsUnsetSold(request, env);
+        case '/api/items/delete':
+          return await handleItemsDelete(request, env);
         case '/api/mark-shipped':
           return await handleMarkShipped(request, env);
         case '/api/my-orders':
@@ -2038,6 +2199,10 @@ export default {
           return await handleAdminItemBlock(request, env);
         case '/api/admin/items/unblock':
           return await handleAdminItemUnblock(request, env);
+        case '/api/admin/items/toggle-reco':
+          return await handleAdminItemsToggleReco(request, env);
+        case '/api/admin/items/delete':
+          return await handleAdminItemsDelete(request, env);
         case '/api/admin/pending-transfers':
           return await handleAdminPendingTransfers(request, env);
         case '/api/admin/confirm-transfer':

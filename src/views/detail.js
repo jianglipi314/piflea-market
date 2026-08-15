@@ -4,7 +4,6 @@ import { state } from '../main';
 import { HIST_KEY } from '../state';
 import { escapeHtml, fmtPrice, timeAgo, fallbackCopy, toast, getAllMyUserIds, getCurrentUserId } from '../utils';
 import { openSheet } from '../components/sheet';
-import { getSupabase } from '../supabase';
 import { apiFetch } from '../api';
 import { getPiUser } from '../pi-sdk';
 
@@ -216,14 +215,12 @@ export async function openDetail(id) {
 
   state.currentDetailId = id;
 
-  // Increment views
-  const supabase = getSupabase();
-  supabase
-    .from('items')
-    .update({ views: (it.views || 0) + 1 })
-    .eq('id', id)
-    .then(() => {});
+  // Increment views (via Worker API for security)
   it.views = (it.views || 0) + 1;
+  apiFetch('/api/items/view', {
+    method: 'POST',
+    body: JSON.stringify({ itemId: id }),
+  }).catch(() => {});
 
   // Save to history
   state.history = [

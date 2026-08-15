@@ -553,9 +553,14 @@ export function piPayTest() {
 export async function markSold(id) {
   if (!confirm('标记为已售？商品将从首页下架')) return;
   try {
-    const supabase = getSupabase();
-    const { error } = await supabase.from('items').update({ status: 'sold' }).eq('id', id);
-    if (error) throw error;
+    const res = await apiFetch('/api/items/mark-sold', {
+      method: 'POST',
+      body: JSON.stringify({ itemId: id }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || '请求失败');
+    }
     const it = state.items.find(x => x.id === id);
     if (it) it.status = 'sold';
     toast('✅ 已标记为已售');
@@ -571,9 +576,14 @@ export async function markSold(id) {
  */
 export async function unsetSold(id) {
   try {
-    const supabase = getSupabase();
-    const { error } = await supabase.from('items').update({ status: 'active' }).eq('id', id);
-    if (error) throw error;
+    const res = await apiFetch('/api/items/unset-sold', {
+      method: 'POST',
+      body: JSON.stringify({ itemId: id }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || '请求失败');
+    }
     const it = state.items.find(x => x.id === id);
     if (it) it.status = 'active';
     toast('✅ 已恢复在售');
@@ -590,9 +600,14 @@ export async function unsetSold(id) {
 export async function deleteItem(id) {
   if (!confirm('确定删除该商品？\n删除后不可恢复，相关订单不受影响。')) return;
   try {
-    const supabase = getSupabase();
-    const { error } = await supabase.from('items').delete().eq('id', id);
-    if (error) throw error;
+    const res = await apiFetch('/api/items/delete', {
+      method: 'POST',
+      body: JSON.stringify({ itemId: id }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || '请求失败');
+    }
     // 从本地 state 移除
     const idx = state.items.findIndex((x) => x.id === id);
     if (idx >= 0) state.items.splice(idx, 1);
