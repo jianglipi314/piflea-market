@@ -326,6 +326,57 @@ async function runRealParamTests() {
   }
 }
 
+/* ============ 真实 /api/chat/messages 测试 ============ */
+async function runRealChatMessagesTest() {
+  const resultEl = document.getElementById('real-chat-msg-test-result');
+  if (!resultEl) return;
+
+  const piUser = typeof window.getPiUser === 'function' ? window.getPiUser() : null;
+  if (!piUser || !piUser.accessToken) {
+    resultEl.innerHTML = '<span style="color:#f44336">❌ 无法测试：accessToken 不可用</span>';
+    return;
+  }
+
+  const token = piUser.accessToken;
+  const tokenMasked = maskToken(token);
+  const tokenLen = token.length;
+  const itemId = 20;
+  const otherUid = 'd1b7e4b8-2ba4-425e-a264-c1f06e05342e';
+  const url = '/api/chat/messages?itemId=' + itemId + '&otherUid=' + encodeURIComponent(otherUid);
+
+  resultEl.innerHTML = `
+    <div style="margin-bottom:8px;font-size:12px;color:var(--ink-2)">
+      <div>itemId: <code>${itemId}</code></div>
+      <div>otherUid: <code>${escapeHtml(otherUid)}</code></div>
+    </div>
+    <div id="real-msg-native-result" style="font-size:13px">⏳ 原生 fetch 测试中...</div>
+    <div id="real-msg-api-fetch-result" style="font-size:13px">⏳ apiFetch 测试中...</div>`;
+
+  // 原生 fetch（仅 Authorization，无 Content-Type）
+  const nativeResult = await doTestRequest(
+    (u) => fetch(BACKEND_URL + u, { headers: { 'Authorization': 'Bearer ' + token } }),
+    url,
+    token
+  );
+  const nativeEl = document.getElementById('real-msg-native-result');
+  if (nativeEl) {
+    nativeEl.innerHTML = '<div style="font-size:11px;color:var(--ink-2);margin-bottom:4px">原生 fetch（仅 Authorization，无 Content-Type）</div>'
+      + renderTestBlock(nativeResult, tokenMasked, tokenLen);
+  }
+
+  // apiFetch（Content-Type: application/json + Authorization）
+  const apiFetchResult = await doTestRequest(
+    (u) => apiFetch(u),
+    url,
+    token
+  );
+  const apiFetchEl = document.getElementById('real-msg-api-fetch-result');
+  if (apiFetchEl) {
+    apiFetchEl.innerHTML = '<div style="font-size:11px;color:var(--ink-2);margin-bottom:4px">apiFetch()（Content-Type: application/json + Authorization）</div>'
+      + renderTestBlock(apiFetchResult, tokenMasked, tokenLen);
+  }
+}
+
 /* ============ /api/chat/list 诊断 ============ */
 async function runChatListDiagnostic() {
   const resultEl = document.getElementById('chat-list-diag-result');
@@ -471,6 +522,12 @@ export function renderDebugAuth() {
         <div id="chat-list-diag-result" style="font-size:13px">⏳ 测试中...</div>
       </div>
 
+      <div style="margin-bottom:16px;border-top:2px dashed var(--line);padding-top:12px">
+        <strong style="font-size:14px">🧪 真实 /api/chat/messages 测试</strong>
+        <div style="font-size:11px;color:var(--ink-2);margin-bottom:8px">itemId=20, otherUid=d1b7e4b8-2ba4-425e-a264-c1f06e05342e</div>
+        <div id="real-chat-msg-test-result" style="font-size:13px">⏳ 测试中...</div>
+      </div>
+
       <div style="font-size:11px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:12px">
         ⚠ 此页面仅用于诊断，不修改任何数据，不发送任何信息到服务器。<br>
         accessToken 已脱敏处理，不会完整显示。<br>
@@ -486,4 +543,5 @@ export function renderDebugAuth() {
   setTimeout(runApiFetchTest, 200);
   setTimeout(runRealParamTests, 300);
   setTimeout(runChatListDiagnostic, 400);
+  setTimeout(runRealChatMessagesTest, 500);
 }
