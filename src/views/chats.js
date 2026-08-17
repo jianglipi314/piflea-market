@@ -80,7 +80,8 @@ export async function loadChatList() {
   try {
     const res = await apiFetch('/api/chat/list');
     if (!res.ok) {
-      throw new Error('HTTP ' + res.status);
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error('HTTP ' + res.status + ' | ' + (errBody.message || errBody.error || 'unknown error'));
     }
     const json = await res.json();
     const data = json.data || [];
@@ -201,7 +202,8 @@ async function loadMessages(itemId, me, other) {
   try {
     const res = await apiFetch('/api/chat/messages?itemId=' + encodeURIComponent(itemId) + '&otherUid=' + encodeURIComponent(other));
     if (!res.ok) {
-      throw new Error('HTTP ' + res.status);
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error('HTTP ' + res.status + ' | ' + (errBody.message || errBody.error || 'unknown error'));
     }
     const json = await res.json();
     const data = json.data || [];
