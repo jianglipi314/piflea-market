@@ -1,7 +1,7 @@
 /* ============ Chats View (Message List) ============ */
 
 import { state } from '../main';
-import { getSupabase } from '../supabase';
+import { apiFetch } from '../api';
 import { escapeHtml, timeAgo, toast, getAllMyUserIds, getCurrentUserId } from '../utils';
 
 const CHATS_VIEWED_KEY = 'pi_flea_chats_viewed_v1';
@@ -61,89 +61,91 @@ let messagesCache = [];
 let currentChatKey = null;
 
 /**
- * Load chat list from Supabase.
+ * Load chat list from Worker API.
+ * 服务端用 token UID 过滤，只返回当前用户参与的会话。
  */
 export async function loadChatList() {
-  const supabase = getSupabase();
-  if (!supabase) return;
-
   const list = document.getElementById('chatList');
   const empty = document.getElementById('chatEmpty');
   const count = document.getElementById('chatCount');
-  const myIds = getAllMyUserIds();
-  const orExpr = myIds.map(id => 'from_uid.eq.' + id + ',to_uid.eq.' + id).join(',');
   const me = getCurrentUserId();
 
-  const { data, error } = await supabase
-    .from('chat_messages')
-    .select('*')
-    .or(orExpr)
-    .order('created_at', { ascending: false })
-    .limit(200);
-
-  if (error) {
-    console.error('loadChatList', error);
-    empty.textContent = '云端消息加载失败';
+  if (!me) {
+    empty.textContent = '请先登录 Pi 账号';
     empty.style.display = 'block';
     count.textContent = '';
     return;
   }
 
-  // Group by conversation key: itemId|sorted(from_uid, to_uid)
-  const groups = {};
-  (data || []).forEach((m) => {
-    const k = m.item_id + '|' + [m.from_uid, m.to_uid].sort().join('|');
-    if (!groups[k]) {
-      groups[k] = { key: k, itemId: m.item_id, messages: [], last: 0 };
+  try {
+    const res = await apiFetch('/api/chat/list');
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status);
     }
-    groups[k].messages.push(m);
-    const t = new Date(m.created_at).getTime();
-    if (t > groups[k].last) groups[k].last = t;
-  });
+    const json = await res.json();
+    const data = json.data || [];
 
-  const list2 = Object.values(groups);
-  empty.style.display = list2.length ? 'none' : 'block';
-  empty.textContent = '还没有消息，点进商品页联系卖家试试～';
-  count.textContent = list2.length ? '共 ' + list2.length + ' 个会话' : '';
-
-  // Count unread conversations
-  let unreadCount = 0;
-  const lastViewed = parseInt(localStorage.getItem(CHATS_VIEWED_KEY) || '0', 10);
-  list2.forEach(g => {
-    const lastMsg = g.messages[g.messages.length - 1];
-    if (lastMsg && new Date(lastMsg.created_at).getTime() > lastViewed) {
-      if (lastMsg.from_uid !== me) unreadCount++;
-    }
-  });
-  updateUnreadBadge(unreadCount);
-
-  list.innerHTML = list2
-    .map((g) => {
-      const last = g.messages[g.messages.length - 1];
-      const isMeSender = last.from_uid === me;
-      const item = state.items.find(
-        (x) => x.id === Number(g.itemId) || x.id === g.itemId
-      );
-      const sellerName = isMeSender
-        ? item ? item.seller : '卖家'
-        : item ? item.seller || '卖家' : '买家';
-
-      return '<div class="chat-item" data-key="' + g.key + '">'
-        + '<div class="avatar">' + escapeHtml((sellerName || '\u03c0').slice(0, 1)) + '</div>'
-        + '<div class="t"><div class="name">' + escapeHtml(sellerName || '聊天') + '</div><div class="last">' + escapeHtml(last.text || '') + '</div></div>'
-        + '<div class="time">' + timeAgo(g.last) + '</div>'
-        + '</div>';
-    })
-    .join('');
-
-  // 事件委托（替换内联 onclick，兼容 Pi Browser）
-  const chatListEl = list;
-  if (chatListEl && !chatListEl.dataset.bound) {
-    chatListEl.dataset.bound = '1';
-    chatListEl.addEventListener('click', function(e) {
-      const item = e.target.closest('[data-key]');
-      if (item) openChatByKey(item.dataset.key);
+    // Group by conversation key: itemId|sorted(from_uid, to_uid)
+    const groups = {};
+    data.forEach((m) => {
+      const k = m.item_id + '|' + [m.from_uid, m.to_uid].sort().join('|');
+      if (!groups[k]) {
+        groups[k] = { key: k, itemId: m.item_id, messages: [], last: 0 };
+      }
+      groups[k].messages.push(m);
+      const t = new Date(m.created_at).getTime();
+      if (t > groups[k].last) groups[k].last = t;
     });
+
+    const list2 = Object.values(groups);
+    empty.style.display = list2.length ? 'none' : 'block';
+    empty.textContent = '还没有消息，点进商品页联系卖家试试～';
+    count.textContent = list2.length ? '共 ' + list2.length + ' 个会话' : '';
+
+    // Count unread conversations
+    let unreadCount = 0;
+    const lastViewed = parseInt(localStorage.getItem(CHATS_VIEWED_KEY) || '0', 10);
+    list2.forEach(g => {
+      const lastMsg = g.messages[g.messages.length - 1];
+      if (lastMsg && new Date(lastMsg.created_at).getTime() > lastViewed) {
+        if (lastMsg.from_uid !== me) unreadCount++;
+      }
+    });
+    updateUnreadBadge(unreadCount);
+
+    list.innerHTML = list2
+      .map((g) => {
+        const last = g.messages[g.messages.length - 1];
+        const isMeSender = last.from_uid === me;
+        const item = state.items.find(
+          (x) => x.id === Number(g.itemId) || x.id === g.itemId
+        );
+        const sellerName = isMeSender
+          ? item ? item.seller : '卖家'
+          : item ? item.seller || '卖家' : '买家';
+
+        return '<div class="chat-item" data-key="' + g.key + '">'
+          + '<div class="avatar">' + escapeHtml((sellerName || '\u03c0').slice(0, 1)) + '</div>'
+          + '<div class="t"><div class="name">' + escapeHtml(sellerName || '聊天') + '</div><div class="last">' + escapeHtml(last.text || '') + '</div></div>'
+          + '<div class="time">' + timeAgo(g.last) + '</div>'
+          + '</div>';
+      })
+      .join('');
+
+    // 事件委托（替换内联 onclick，兼容 Pi Browser）
+    const chatListEl = list;
+    if (chatListEl && !chatListEl.dataset.bound) {
+      chatListEl.dataset.bound = '1';
+      chatListEl.addEventListener('click', function(e) {
+        const item = e.target.closest('[data-key]');
+        if (item) openChatByKey(item.dataset.key);
+      });
+    }
+  } catch (err) {
+    console.error('loadChatList', err);
+    empty.textContent = '云端消息加载失败';
+    empty.style.display = 'block';
+    count.textContent = '';
   }
 }
 
@@ -191,43 +193,38 @@ async function openChatReal(item, otherUid) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
+/**
+ * Load messages for a specific conversation from Worker API.
+ * 服务端校验当前用户是会话参与者，防止读取他人私聊。
+ */
 async function loadMessages(itemId, me, other) {
-  const supabase = getSupabase();
-  if (!supabase) return;
+  try {
+    const res = await apiFetch('/api/chat/messages?itemId=' + encodeURIComponent(itemId) + '&otherUid=' + encodeURIComponent(other));
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status);
+    }
+    const json = await res.json();
+    const data = json.data || [];
 
-  const myIds = getAllMyUserIds();
-  const fromParts = myIds.map(id => 'and(from_uid.eq.' + id + ',to_uid.eq.' + other + ')');
-  const toParts = myIds.map(id => 'and(from_uid.eq.' + other + ',to_uid.eq.' + id + ')');
-  const orExpr = [...fromParts, ...toParts].join(',');
+    const newCache = data.map((m) => ({
+      from: m.from_uid === me ? 'me' : 'seller',
+      text: m.text,
+      t: new Date(m.created_at).getTime(),
+    }));
 
-  const { data, error } = await supabase
-    .from('chat_messages')
-    .select('*')
-    .or(orExpr)
-    .eq('item_id', itemId)
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    toast('消息加载失败：' + error.message);
-    return;
-  }
-
-  const newCache = (data || []).map((m) => ({
-    from: m.from_uid === me ? 'me' : 'seller',
-    text: m.text,
-    t: new Date(m.created_at).getTime(),
-  }));
-
-  // 只在消息数量或最后一条内容变化时重新渲染
-  if (newCache.length !== messagesCache.length ||
-      (newCache.length > 0 && messagesCache.length > 0 &&
-       newCache[newCache.length - 1].text !== messagesCache[messagesCache.length - 1].text)) {
-    messagesCache = newCache;
-    renderBubbles();
-  } else if (messagesCache.some(m => m.pending)) {
-    // 替换 pending 消息
-    messagesCache = newCache;
-    renderBubbles();
+    // 只在消息数量或最后一条内容变化时重新渲染
+    if (newCache.length !== messagesCache.length ||
+        (newCache.length > 0 && messagesCache.length > 0 &&
+         newCache[newCache.length - 1].text !== messagesCache[messagesCache.length - 1].text)) {
+      messagesCache = newCache;
+      renderBubbles();
+    } else if (messagesCache.some(m => m.pending)) {
+      // 替换 pending 消息
+      messagesCache = newCache;
+      renderBubbles();
+    }
+  } catch (err) {
+    toast('消息加载失败：' + (err.message || '请检查网络'));
   }
 }
 
@@ -276,7 +273,8 @@ function renderBubbles() {
 }
 
 /**
- * Send a chat message.
+ * Send a chat message via Worker API.
+ * from_uid 由服务端从 Pi token 获取，客户端不传。
  */
 export async function sendMsg() {
   const inp = document.getElementById('chatInput');
@@ -298,16 +296,22 @@ export async function sendMsg() {
   messagesCache.push({ from: 'me', text, t: Date.now(), pending: true });
   renderBubbles();
 
-  const supabase = getSupabase();
-  const { error } = await supabase.from('chat_messages').insert({
-    item_id: Number(itemId) || itemId,
-    from_uid: getCurrentUserId(),
-    to_uid: other,
-    text: text,
-  });
+  try {
+    const res = await apiFetch('/api/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        itemId: Number(itemId) || itemId,
+        toUid: other,
+        text: text,
+      }),
+    });
 
-  if (error) {
-    toast('发送失败：' + error.message);
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || 'HTTP ' + res.status);
+    }
+  } catch (err) {
+    toast('发送失败：' + (err.message || '请检查网络'));
     // Remove the pending message on error
     messagesCache = messagesCache.filter(m => m.text !== text || !m.pending);
     renderBubbles();
@@ -316,15 +320,23 @@ export async function sendMsg() {
 }
 
 /**
- * Check if the chat_messages table exists.
+ * Check if the chat API is available.
  */
 export async function checkChatTable() {
-  const supabase = getSupabase();
-  if (!supabase) { toast('请先等待云端连接'); return; }
+  const me = getCurrentUserId();
+  if (!me) {
+    toast('请先登录 Pi 账号');
+    return;
+  }
   try {
-    const { error } = await supabase.from('chat_messages').select('id').limit(1);
-    if (!error) { toast('聊天功能已就绪'); loadChatList(); return; }
-    toast('聊天表异常：' + (error.message || ''));
+    const res = await apiFetch('/api/chat/list');
+    if (res.ok) {
+      toast('聊天功能已就绪');
+      loadChatList();
+      return;
+    }
+    const errJson = await res.json().catch(() => ({}));
+    toast('聊天表异常：' + (errJson.error || 'HTTP ' + res.status));
   } catch (e) {
     toast('检测失败：' + (e.message || ''));
   }

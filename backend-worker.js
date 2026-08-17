@@ -107,6 +107,10 @@ const AUTH_REQUIRED_ROUTES = [
   '/api/items/mark-sold',
   '/api/items/unset-sold',
   '/api/items/delete',
+  // 聊天 API：身份从 Pi token 获取，服务端强制 from_uid，禁止前端传入
+  '/api/chat/list',
+  '/api/chat/messages',
+  '/api/chat/send',
   // 管理员 API：所有 /api/admin/* 都需要 Pi token 解析 uid，handler 内再校验 ADMIN_UIDS
   '/api/admin/reports',
   '/api/admin/reports/review',
@@ -2116,6 +2120,109 @@ async function handleTransferToSeller(request, env) {
   }
 }
 
+// ============ 聊天 API（Worker 用 service_role 访问 chat_messages，不依赖前端直连 Supabase）============
+
+// GET /api/chat/list — 查询当前用户参与的所有会话
+async function handleChatList(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const uid = piUser.uid;
+
+    // 查询条件：from_uid = 当前用户 OR to_uid = 当前用户
+    // 使用 PostgREST or 语法，服务端强制用 token UID 构造，禁止客户端传入 uid 参数
+    const filter = `or=(from_uid.eq.${encodeURIComponent(uid)},to_uid.eq.${encodeURIComponent(uid)})`;
+    const messages = await supabaseRequest(
+      `/chat_messages?order=created_at.desc&limit=200&${filter}`,
+      'GET', null, env
+    );
+
+    return jsonResponse({ success: true, data: messages || [] }, 200, env);
+  } catch (err) {
+    console.error('chat/list error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// GET /api/chat/messages — 查询指定会话的消息（当前用户必须是参与者）
+async function handleChatMessages(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const uid = piUser.uid;
+
+    const url = new URL(request.url);
+    const itemId = url.searchParams.get('itemId');
+    const otherUid = url.searchParams.get('otherUid');
+
+    if (!itemId || !otherUid) {
+      return jsonResponse({ success: false, error: 'itemId and otherUid required' }, 400, env);
+    }
+
+    // 安全校验：当前用户必须是会话参与者（from_uid 或 to_uid 包含当前用户）
+    // 防止通过修改 itemId/otherUid 读取他人私聊
+    // 查询条件：(from_uid=uid AND to_uid=otherUid) OR (from_uid=otherUid AND to_uid=uid)
+    const filter = `or=(and(from_uid.eq.${encodeURIComponent(uid)},to_uid.eq.${encodeURIComponent(otherUid)}),and(from_uid.eq.${encodeURIComponent(otherUid)},to_uid.eq.${encodeURIComponent(uid)}))`;
+    const messages = await supabaseRequest(
+      `/chat_messages?item_id=eq.${encodeURIComponent(itemId)}&order=created_at.asc&${filter}`,
+      'GET', null, env
+    );
+
+    return jsonResponse({ success: true, data: messages || [] }, 200, env);
+  } catch (err) {
+    console.error('chat/messages error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
+// POST /api/chat/send — 发送消息（from_uid 强制使用 token 验证的 UID）
+async function handleChatSend(request, env) {
+  try {
+    const piUser = request.piUser;
+    if (!piUser || !piUser.uid) {
+      return jsonResponse({ success: false, error: 'Authentication required' }, 401, env);
+    }
+    const uid = piUser.uid;
+
+    const body = await request.json();
+    const itemId = body.itemId;
+    const toUid = body.toUid;
+    const text = body.text;
+
+    // 参数校验
+    if (!itemId) {
+      return jsonResponse({ success: false, error: 'itemId required' }, 400, env);
+    }
+    if (!toUid) {
+      return jsonResponse({ success: false, error: 'toUid required' }, 400, env);
+    }
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return jsonResponse({ success: false, error: 'text required' }, 400, env);
+    }
+    if (text.length > 500) {
+      return jsonResponse({ success: false, error: 'text must be <= 500 characters' }, 400, env);
+    }
+
+    // 安全：from_uid 强制使用 token 验证的 UID，禁止前端传入
+    // 只接受前端传入的 itemId、toUid、text
+    const row = await supabaseRequest('/chat_messages', 'POST', {
+      item_id: itemId,
+      from_uid: uid,
+      to_uid: toUid,
+      text: text.trim(),
+    }, env);
+
+    return jsonResponse({ success: true, data: row }, 201, env);
+  } catch (err) {
+    console.error('chat/send error:', err);
+    return jsonResponse({ success: false, error: err.message }, 500, env);
+  }
+}
+
 // ============ 路由分发 ============
 
 export default {
@@ -2190,6 +2297,13 @@ export default {
           return await handleReport(request, env);
         case '/api/transfer-to-seller':
           return await handleTransferToSeller(request, env);
+        // 聊天 API（身份从 Pi token 获取，服务端强制 from_uid）
+        case '/api/chat/list':
+          return await handleChatList(request, env);
+        case '/api/chat/messages':
+          return await handleChatMessages(request, env);
+        case '/api/chat/send':
+          return await handleChatSend(request, env);
         // 管理员 API（handler 内 requireAdmin 校验 ADMIN_UIDS）
         case '/api/admin/reports':
           return await handleAdminReports(request, env);
