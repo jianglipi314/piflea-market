@@ -326,6 +326,65 @@ async function runRealParamTests() {
   }
 }
 
+/* ============ /api/chat/list 诊断 ============ */
+async function runChatListDiagnostic() {
+  const resultEl = document.getElementById('chat-list-diag-result');
+  if (!resultEl) return;
+
+  resultEl.innerHTML = '<span style="color:var(--ink-2)">⏳ 测试中...</span>';
+
+  try {
+    const res = await apiFetch('/api/chat/list');
+    const status = res.status;
+    let body = '';
+    let parsed = null;
+    try {
+      body = await res.text();
+      try { parsed = JSON.parse(body); } catch (_) {}
+    } catch (_) {}
+
+    const statusColor = res.ok ? '#4caf50' : '#f44336';
+    const errorMsg = parsed ? (parsed.error || parsed.message || '') : '';
+    const debugInfo = parsed ? (parsed._debug || '') : '';
+    const data = parsed ? parsed.data : null;
+    const isArray = Array.isArray(data);
+    const dataLen = isArray ? data.length : 'N/A';
+
+    let extraInfo = '';
+    if (isArray && dataLen > 0) {
+      const first = data[0];
+      extraInfo = `
+        <div style="margin-top:6px;font-size:12px;color:var(--ink)">
+          <div>第一条数据字段:</div>
+          <div style="padding-left:8px">item_id: <code>${escapeHtml(String(first.item_id ?? 'N/A'))}</code></div>
+          <div style="padding-left:8px">from_uid: <code>${escapeHtml(String(first.from_uid ?? 'N/A'))}</code></div>
+          <div style="padding-left:8px">to_uid: <code>${escapeHtml(String(first.to_uid ?? 'N/A'))}</code></div>
+          <div style="padding-left:8px">created_at: <code>${escapeHtml(String(first.created_at ?? 'N/A'))}</code></div>
+        </div>`;
+    } else if (isArray && dataLen === 0) {
+      extraInfo = '<div style="margin-top:6px;font-size:12px;color:#ff9800">⚠ Worker 返回空数组</div>';
+    }
+
+    resultEl.innerHTML = `
+      <div style="padding:10px;border-radius:8px;background:${statusColor}15;border:1px solid ${statusColor}">
+        <div><strong>HTTP ${status}</strong> <span style="color:${statusColor}">${res.ok ? '✅' : '❌'}</span></div>
+        <div style="margin-top:4px">response.ok: ${res.ok}</div>
+        ${errorMsg ? `<div style="margin-top:4px;color:${statusColor}">${escapeHtml(errorMsg)}</div>` : ''}
+        ${debugInfo ? `<div style="margin-top:4px;color:#ff9800;font-size:12px">DEBUG: ${escapeHtml(debugInfo)}</div>` : ''}
+        <div style="margin-top:4px">data 类型: ${isArray ? 'Array' : (data === null ? 'null' : typeof data)}</div>
+        <div style="margin-top:4px">data 长度: ${dataLen}</div>
+        ${extraInfo}
+        ${!errorMsg && !debugInfo && !isArray ? `<div style="margin-top:4px;font-size:12px;color:var(--ink-2)">原始响应: ${escapeHtml(body.slice(0, 300))}${body.length > 300 ? '...' : ''}</div>` : ''}
+      </div>`;
+  } catch (err) {
+    resultEl.innerHTML = `
+      <div style="padding:10px;border-radius:8px;background:#f4433615;border:1px solid #f44336">
+        <div><strong>/api/chat/list 网络错误</strong></div>
+        <div style="margin-top:4px;font-size:12px;color:#f44336">${escapeHtml(err.message || String(err))}</div>
+      </div>`;
+  }
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
@@ -406,6 +465,12 @@ export function renderDebugAuth() {
         <div id="real-param-test-result" style="font-size:13px">⏳ 测试中...</div>
       </div>
 
+      <div style="margin-bottom:16px;border-top:2px dashed var(--line);padding-top:12px">
+        <strong style="font-size:14px">🔍 /api/chat/list 诊断</strong>
+        <div style="font-size:11px;color:var(--ink-2);margin-bottom:8px">检查 apiFetch('/api/chat/list') 返回的原始数据</div>
+        <div id="chat-list-diag-result" style="font-size:13px">⏳ 测试中...</div>
+      </div>
+
       <div style="font-size:11px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:12px">
         ⚠ 此页面仅用于诊断，不修改任何数据，不发送任何信息到服务器。<br>
         accessToken 已脱敏处理，不会完整显示。<br>
@@ -420,4 +485,5 @@ export function renderDebugAuth() {
   setTimeout(runAuthTest, 100);
   setTimeout(runApiFetchTest, 200);
   setTimeout(runRealParamTests, 300);
+  setTimeout(runChatListDiagnostic, 400);
 }
