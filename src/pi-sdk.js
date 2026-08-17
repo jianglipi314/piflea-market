@@ -204,10 +204,15 @@ function silentReAuth() {
   ).then(function(authResult) {
     if (authResult && authResult.user) {
       console.log('[silentReAuth] Success, got payments scope for:', authResult.user.username);
+      // 安全：只在新 accessToken 为有效非空字符串时才覆盖旧 token
+      // 防止 authResult.accessToken 为 undefined 导致 JSON.stringify 省略该字段，
+      // 从而丢失 localStorage 中已保存的有效 accessToken。
+      const newToken = authResult.accessToken;
+      const isValidToken = typeof newToken === 'string' && newToken.trim().length > 0;
       piUser = {
         uid: authResult.user.uid,
         username: authResult.user.username,
-        accessToken: authResult.accessToken,
+        accessToken: isValidToken ? newToken : (piUser && piUser.accessToken) || '',
       };
       localStorage.setItem(PI_USER_KEY, JSON.stringify(piUser));
     }
