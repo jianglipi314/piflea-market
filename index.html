@@ -330,6 +330,7 @@
       <div class="srow link" id="link-terms"><div class="lb">📜 用户协议</div><span class="arrow">›</span></div>
       <div class="srow link" id="link-privacy"><div class="lb">🔒 隐私政策</div><span class="arrow">›</span></div>
       <div class="srow link" id="link-feedback"><div class="lb">💬 帮助与反馈</div><span class="arrow">›</span></div>
+      <div class="srow link" id="link-debug" style="opacity:0.4;font-size:12px"><div class="lb">🔧 诊断</div><span class="arrow">›</span></div>
     </div>
   </section>
 
@@ -367,6 +368,15 @@
       <div class="list" id="adminList"></div>
       <div class="empty" style="padding:18px 0 60px">— end —</div>
     </div>
+  </section>
+
+  <!-- 临时诊断：认证状态 -->
+  <section class="view" id="view-debug-auth">
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+      <h3>认证诊断</h3>
+      <button class="ghost" id="debug-refresh" style="font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:6px">刷新</button>
+    </div>
+    <div id="debug-output"></div>
   </section>
 
   <!-- Bottom Nav -->
