@@ -930,7 +930,7 @@
 }
 .chat-item .time { font-size: 12px; color: var(--ink-2); }
 
-#view-chat {
+.view#view-chat.active {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 68px);
