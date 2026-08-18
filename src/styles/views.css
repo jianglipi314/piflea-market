@@ -719,7 +719,7 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 56px;
+  bottom: 68px;
   max-width: 460px;
   margin: 0 auto;
   background: var(--card);
@@ -1006,7 +1006,7 @@
   gap: 8px;
   align-items: center;
   box-shadow: var(--shadow);
-  z-index: 15;
+  z-index: 31;
 }
 
 .chat-input input {
