@@ -159,7 +159,14 @@ export async function openChatByKey(key) {
   const me = myIds.includes(uid1) ? uid1 : uid2;
   const other = me === uid1 ? uid2 : uid1;
   currentChatKey = key;
-  const item = state.items.find((x) => String(x.id) === itemId);
+  let item = state.items.find((x) => String(x.id) === itemId);
+  if (!item) {
+    item = {
+      id: Number(itemId) || itemId,
+      title: '闲置商品',
+      seller: '卖家'
+    };
+  }
   await openChatReal(item, other);
 }
 
