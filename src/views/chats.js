@@ -2,7 +2,7 @@
 
 import { state } from '../main';
 import { apiFetch } from '../api';
-import { escapeHtml, timeAgo, toast, getAllMyUserIds, getCurrentUserId } from '../utils';
+import { escapeHtml, timeAgo, toast, getAllMyUserIds, getCurrentUserId, getPiUid } from '../utils';
 
 const CHATS_VIEWED_KEY = 'pi_flea_chats_viewed_v1';
 
@@ -180,6 +180,12 @@ export async function openChatByItem(item, otherUid, key) {
 
 async function openChatReal(item, otherUid) {
   if (!item) { toast('商品不存在'); return; }
+
+  // 未登录 Pi 账号时禁止进入聊天（在切换视图和调用 loadMessages 之前拦截）
+  if (!getPiUid()) {
+    toast('请先登录 Pi 账号');
+    return;
+  }
 
   // Bind chat buttons (idempotent)
   initChatButtons();
