@@ -933,7 +933,8 @@
 .view#view-chat.active {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 68px);
+  height: calc(100vh - 124px);
+  height: calc(100dvh - 124px);
 }
 
 .chat-head {
