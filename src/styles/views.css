@@ -457,6 +457,11 @@
   flex-shrink: 0;
 }
 
+/* 完整显示商品主体：覆盖 detail.js inline style 的 object-fit:cover */
+.hero-gallery img[style] {
+  object-fit: contain !important;
+}
+
 .hero .back,
 .hero .share {
   position: absolute;
@@ -935,6 +940,11 @@
   flex-direction: column;
   height: calc(100vh - 124px);
   height: calc(100dvh - 124px);
+}
+
+/* 聊天输入框获得焦点（键盘弹出）时隐藏底部导航，避免遮挡输入框 */
+.view#view-chat.active:focus-within ~ .nav {
+  display: none;
 }
 
 .chat-head {
