@@ -5,6 +5,8 @@ import { apiFetch } from '../api';
 import { escapeHtml, timeAgo, toast, getAllMyUserIds, getCurrentUserId, getPiUid } from '../utils';
 
 const CHATS_VIEWED_KEY = 'pi_flea_chats_viewed_v1';
+// 会话级已读时间戳（纯前端展示，不涉及数据库）
+const CHAT_READS_KEY = 'pi_flea_chat_reads_v1';
 
 /**
  * Bind chat view buttons via addEventListener (idempotent via flags).
@@ -38,8 +40,31 @@ export function initChatButtons() {
 /**
  * Record that the user viewed the chats page.
  */
-export function markChatsViewed() {
+function markChatsViewed() {
   localStorage.setItem(CHATS_VIEWED_KEY, String(Date.now()));
+}
+
+/**
+ * 读取会话级已读时间戳表 { conversationKey: timestamp }。
+ */
+function getChatReads() {
+  try {
+    return JSON.parse(localStorage.getItem(CHAT_READS_KEY) || '{}') || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+/**
+ * 标记某个会话已读（进入该聊天并成功加载消息后调用）。
+ */
+function markChatRead(key) {
+  if (!key) return;
+  try {
+    const reads = getChatReads();
+    reads[key] = Math.max(reads[key] || 0, Date.now());
+    localStorage.setItem(CHAT_READS_KEY, JSON.stringify(reads));
+  } catch (e) {}
 }
 
 /**
@@ -61,19 +86,91 @@ let messagesCache = [];
 let currentChatKey = null;
 
 /**
+ * 按「商品 + 双方 UID」把消息分组为会话，并记录最新一条消息。
+ * 注意：/api/chat/list 返回 created_at 倒序，数组末位是最旧消息，
+ * 必须按时间比较取最新，否则未读判断和列表预览都会取错。
+ */
+function groupConversations(data) {
+  const groups = {};
+  (data || []).forEach((m) => {
+    const k = m.item_id + '|' + [m.from_uid, m.to_uid].sort().join('|');
+    if (!groups[k]) {
+      groups[k] = { key: k, itemId: m.item_id, messages: [], last: 0, lastMsg: null };
+    }
+    groups[k].messages.push(m);
+    const t = new Date(m.created_at).getTime();
+    if (t > groups[k].last) {
+      groups[k].last = t;
+      groups[k].lastMsg = m;
+    }
+  });
+  return Object.values(groups);
+}
+
+/**
+ * 会话未读判定：最新一条来自对方，且晚于
+ * max(上次进入消息中心时间, 该会话本地已读时间)。
+ */
+function isConvUnread(g, me) {
+  const lastMsg = g.lastMsg;
+  if (!lastMsg || lastMsg.from_uid === me) return false;
+  const lastViewed = parseInt(localStorage.getItem(CHATS_VIEWED_KEY) || '0', 10);
+  const readAt = Math.max(lastViewed, getChatReads()[g.key] || 0);
+  return new Date(lastMsg.created_at).getTime() > readAt;
+}
+
+/* ============ 全局未读轮询（仅更新红点，不渲染聊天列表） ============ */
+let unreadPollTimer = null;
+let unreadPollFetching = false;
+const UNREAD_POLL_MS = 20000;
+
+async function refreshUnreadBadge() {
+  // 仅登录用户请求；未登录直接隐藏红点
+  const me = getPiUid();
+  if (!me) {
+    updateUnreadBadge(0);
+    return;
+  }
+  if (document.hidden || unreadPollFetching) return;
+  unreadPollFetching = true;
+  try {
+    const res = await apiFetch('/api/chat/list');
+    if (!res.ok) return;
+    const json = await res.json();
+    const list = groupConversations(json.data || []);
+    updateUnreadBadge(list.reduce((n, g) => n + (isConvUnread(g, me) ? 1 : 0), 0));
+  } catch (e) {
+    // 静默失败，等待下一轮
+  } finally {
+    unreadPollFetching = false;
+  }
+}
+
+/**
+ * 启动全局新消息轮询（全局唯一定时器，main.js 初始化时调用一次）。
+ */
+export function startUnreadPolling() {
+  if (unreadPollTimer) return;
+  refreshUnreadBadge();
+  unreadPollTimer = setInterval(refreshUnreadBadge, UNREAD_POLL_MS);
+}
+
+/**
  * Load chat list from Worker API.
  * 服务端用 token UID 过滤，只返回当前用户参与的会话。
  */
-export async function loadChatList() {
+export async function loadChatList(markViewed = false) {
   const list = document.getElementById('chatList');
   const empty = document.getElementById('chatEmpty');
   const count = document.getElementById('chatCount');
-  const me = getCurrentUserId();
+  // 未读判断使用真实 Pi UID（与 /api/chat/list 的 token 过滤一致）
+  const me = getPiUid();
 
   if (!me) {
     empty.textContent = '请先登录 Pi 账号';
     empty.style.display = 'block';
     count.textContent = '';
+    updateUnreadBadge(0);
     return;
   }
 
@@ -84,40 +181,19 @@ export async function loadChatList() {
       throw new Error('HTTP ' + res.status + ' | ' + (errBody.message || errBody.error || 'unknown error'));
     }
     const json = await res.json();
-    const data = json.data || [];
-
-    // Group by conversation key: itemId|sorted(from_uid, to_uid)
-    const groups = {};
-    data.forEach((m) => {
-      const k = m.item_id + '|' + [m.from_uid, m.to_uid].sort().join('|');
-      if (!groups[k]) {
-        groups[k] = { key: k, itemId: m.item_id, messages: [], last: 0 };
-      }
-      groups[k].messages.push(m);
-      const t = new Date(m.created_at).getTime();
-      if (t > groups[k].last) groups[k].last = t;
-    });
-
-    const list2 = Object.values(groups);
+    const list2 = groupConversations(json.data || []);
     empty.style.display = list2.length ? 'none' : 'block';
     empty.textContent = '还没有消息，点进商品页联系卖家试试～';
     count.textContent = list2.length ? '共 ' + list2.length + ' 个会话' : '';
 
-    // Count unread conversations
-    let unreadCount = 0;
-    const lastViewed = parseInt(localStorage.getItem(CHATS_VIEWED_KEY) || '0', 10);
-    list2.forEach(g => {
-      const lastMsg = g.messages[g.messages.length - 1];
-      if (lastMsg && new Date(lastMsg.created_at).getTime() > lastViewed) {
-        if (lastMsg.from_uid !== me) unreadCount++;
-      }
-    });
-    updateUnreadBadge(unreadCount);
+    // 先计算未读并更新红点（此时 lastViewed 仍是上次进入消息中心的时间）
+    updateUnreadBadge(list2.reduce((n, g) => n + (isConvUnread(g, me) ? 1 : 0), 0));
 
     list.innerHTML = list2
       .map((g) => {
-        const last = g.messages[g.messages.length - 1];
-        const isMeSender = last.from_uid === me;
+        const last = g.lastMsg; // 最新一条消息（API 返回为倒序，不能取数组末位）
+        const isMeSender = last && last.from_uid === me;
+        const unread = isConvUnread(g, me);
         const item = state.items.find(
           (x) => x.id === Number(g.itemId) || x.id === g.itemId
         );
@@ -125,9 +201,16 @@ export async function loadChatList() {
           ? item ? item.seller : '卖家'
           : item ? item.seller || '卖家' : '买家';
 
+        // 未读会话：标题加粗 + 红点，预览加重
+        const nameStyle = unread ? ' style="font-weight:800"' : '';
+        const unreadDot = unread
+          ? ' <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff3b30;vertical-align:middle"></span>'
+          : '';
+        const lastStyle = unread ? ' style="font-weight:600;color:var(--ink)"' : '';
+
         return '<div class="chat-item" data-key="' + g.key + '">'
           + '<div class="avatar">' + escapeHtml((sellerName || '\u03c0').slice(0, 1)) + '</div>'
-          + '<div class="t"><div class="name">' + escapeHtml(sellerName || '聊天') + '</div><div class="last">' + escapeHtml(last.text || '') + '</div></div>'
+          + '<div class="t"><div class="name"' + nameStyle + '>' + escapeHtml(sellerName || '聊天') + unreadDot + '</div><div class="last"' + lastStyle + '>' + escapeHtml((last && last.text) || '') + '</div></div>'
           + '<div class="time">' + timeAgo(g.last) + '</div>'
           + '</div>';
       })
@@ -142,6 +225,9 @@ export async function loadChatList() {
         if (item) openChatByKey(item.dataset.key);
       });
     }
+
+    // 列表和红点都完成后才标记「已进入消息中心」，保证本次未读先正确显示
+    if (markViewed) markChatsViewed();
   } catch (err) {
     console.error('loadChatList', err);
     empty.textContent = '云端消息加载失败';
@@ -204,6 +290,8 @@ async function openChatReal(item, otherUid) {
 
   await loadMessages(item.id, me, otherUid);
   subscribeMessages(item.id, me, otherUid);
+  // 进入聊天后立即刷新红点（该会话已在 loadMessages 成功后标记已读）
+  refreshUnreadBadge();
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -238,6 +326,9 @@ async function loadMessages(itemId, me, other) {
       messagesCache = newCache;
       renderBubbles();
     }
+
+    // 成功加载即视为已读该会话（仅本地时间戳，3 秒轮询会持续续期）
+    if (currentChatKey) markChatRead(currentChatKey);
   } catch (err) {
     toast('消息加载失败：' + (err.message || '请检查网络'));
   }

@@ -18,7 +18,7 @@ import { doSearch, onSearch } from './views/search';
 import { clearForm, doPublish, onFiles, removeImg, togglePreview, openEdit } from './views/publish';
 import { openDetail, fakeBuy, openDetailChat } from './views/detail';
 import { openOrder, confirmPayment } from './views/order';
-import { loadChatList, openChatByKey, sendMsg, checkChatTable } from './views/chats';
+import { loadChatList, openChatByKey, sendMsg, checkChatTable, startUnreadPolling } from './views/chats';
 import {
   renderMine,
   switchMine,
@@ -122,6 +122,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
+
+  // 启动全局新消息轮询（内部自行判断登录状态，仅更新底部红点）
+  startUnreadPolling();
 
   // Apply dark mode
   applyDarkOnLoad();

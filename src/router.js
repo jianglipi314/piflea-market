@@ -4,7 +4,7 @@ import { state } from './main';
 import { loadItems } from './views/home';
 import { renderMine } from './views/mine';
 import { renderTagCloud, onSearch } from './views/search';
-import { loadChatList, markChatsViewed } from './views/chats';
+import { loadChatList } from './views/chats';
 import { renderAdmin } from './views/admin';
 import { renderDebugAuth } from './views/debug-auth';
 import { clearForm, initFormListener } from './views/publish';
@@ -52,7 +52,8 @@ export function goto(name) {
     renderTagCloud();
     onSearch();
   }
-  if (name === 'chats') { loadChatList(); markChatsViewed(); }
+  // 传入 markViewed=true：loadChatList 在完成未读计算、更新红点和渲染列表后才标记已查看
+  if (name === 'chats') loadChatList(true);
   if (name === 'admin') renderAdmin();
   if (name === 'debug-auth') renderDebugAuth();
   if (name === 'publish') {
