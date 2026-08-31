@@ -6,7 +6,7 @@ import { renderMine } from './views/mine';
 import { renderTagCloud, onSearch } from './views/search';
 import { loadChatList } from './views/chats';
 import { renderAdmin } from './views/admin';
-import { renderDebugAuth } from './views/debug-auth';
+
 import { clearForm, initFormListener } from './views/publish';
 
 const viewTitles = {
@@ -20,7 +20,7 @@ const viewTitles = {
   chat:   ['聊天', '与卖家沟通'],
   mine:   ['我的', '个人中心'],
   admin:  ['运营后台', '云端管理面板'],
-  'debug-auth': ['认证诊断', '临时诊断工具'],
+  
 };
 
 /**
@@ -55,7 +55,6 @@ export function goto(name) {
   // 传入 markViewed=true：loadChatList 在完成未读计算、更新红点和渲染列表后才标记已查看
   if (name === 'chats') loadChatList(true);
   if (name === 'admin') renderAdmin();
-  if (name === 'debug-auth') renderDebugAuth();
   if (name === 'publish') {
     initFormListener();
     // Clear stale editId when navigating via nav bar (not via openEdit)

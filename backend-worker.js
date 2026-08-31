@@ -91,6 +91,13 @@ async function verifyPiToken(request, env) {
 // 需要鉴权的路由列表
 const AUTH_REQUIRED_ROUTES = [
   '/api/approve',
+  '/payments/approve',
+  '/api/complete',
+  '/payments/complete',
+  '/api/cancelled_payment',
+  '/payments/cancelled_payment',
+  '/api/incomplete',
+  '/payments/incomplete',
   '/api/transfer-to-seller',
   '/api/mark-shipped',
   '/api/my-orders',
@@ -798,6 +805,20 @@ async function handleComplete(request, env) {
       return errorResponse('Order not found', 400, 'order_not_found', env);
     }
 
+    // 鉴权：只有买家本人才能完成支付（token UID 必须与订单 buyer_id 一致）
+    const buyerUid = request.piUser ? request.piUser.uid : null;
+    if (!buyerUid) {
+      return errorResponse('Authentication required', 401, 'unauthorized', env);
+    }
+    if (existing.buyer_id !== buyerUid) {
+      console.error('SECURITY: Non-buyer attempted to complete payment', {
+        paymentId,
+        buyerUid,
+        orderBuyerId: existing.buyer_id,
+      });
+      return errorResponse('Only the buyer can complete this payment', 403, 'forbidden', env);
+    }
+
     // 先调用 Pi Platform API 获取支付详情，验证 paymentId 和 txid 关联关系
     let piPayment;
     try {
@@ -879,9 +900,21 @@ async function handleCancelled(request, env) {
     const { paymentId } = await request.json();
     if (!paymentId) return errorResponse('paymentId required', 400, 'missing_payment_id', env);
 
+    // 鉴权：只有买家本人才能取消支付（token UID 必须与订单 buyer_id 一致）
+    const buyerUid = request.piUser ? request.piUser.uid : null;
+    if (!buyerUid) return errorResponse('Authentication required', 401, 'unauthorized', env);
+
     const existing = await getOrderByPaymentId(paymentId, env);
 
     if (existing) {
+      if (existing.buyer_id !== buyerUid) {
+        console.error('SECURITY: Non-buyer attempted to cancel payment', {
+          paymentId,
+          buyerUid,
+          orderBuyerId: existing.buyer_id,
+        });
+        return errorResponse('Only the buyer can cancel this payment', 403, 'forbidden', env);
+      }
       // 已完成订单不能取消（兼容 paid）
       if (isCompleted(existing.status)) {
         return errorResponse('Cannot cancel completed payment', 400, 'already_completed', env);
@@ -903,6 +936,7 @@ async function handleCancelled(request, env) {
       // 没有订单记录也创建一个 cancelled 记录，防止后续重复处理
       await createOrder({
         payment_id: paymentId,
+        buyer_id: buyerUid,
         status: 'cancelled',
         cancelled: true,
         created_at: new Date().toISOString(),
@@ -924,10 +958,23 @@ async function handleCancelled(request, env) {
 // 4. POST /api/incomplete - 处理未完成支付（新增）
 async function handleIncomplete(request, env) {
   try {
-    const { payment, paymentId, txid, txURL } = await request.json();
+    const { payment, paymentId, txid } = await request.json();
     if (!paymentId) return errorResponse('paymentId required', 400, 'missing_payment_id', env);
 
+    // 鉴权：只有买家本人才能处理未完成支付（token UID 必须与订单 buyer_id 一致）
+    const buyerUid = request.piUser ? request.piUser.uid : null;
+    if (!buyerUid) return errorResponse('Authentication required', 401, 'unauthorized', env);
+
     const existing = await getOrderByPaymentId(paymentId, env);
+
+    if (existing && existing.buyer_id !== buyerUid) {
+      console.error('SECURITY: Non-buyer attempted to handle incomplete payment', {
+        paymentId,
+        buyerUid,
+        orderBuyerId: existing.buyer_id,
+      });
+      return errorResponse('Only the buyer can handle this incomplete payment', 403, 'forbidden', env);
+    }
 
     // 如果已经处理过（兼容 paid），直接返回
     if (existing && isCompleted(existing.status)) {
@@ -938,44 +985,16 @@ async function handleIncomplete(request, env) {
       }, 200, env);
     }
 
-    // 验证交易（如果有 txURL）
-    let verifiedPaymentId = null;
-    let horizonFailed = false;
-    if (txURL) {
-      try {
-        const horizonRes = await fetch(txURL, { headers: { 'Accept': 'application/json' } });
-        if (horizonRes.ok) {
-          const horizonData = await horizonRes.json();
-          verifiedPaymentId = horizonData.memo;
-        } else {
-          horizonFailed = true;
-          console.warn('Horizon returned non-OK status:', horizonRes.status);
-        }
-      } catch (e) {
-        horizonFailed = true;
-        console.warn('Horizon verification failed:', e);
-      }
-    }
-
-    // 安全修复：Horizon 失败时，用 Pi Platform API 二次确认
-    if (horizonFailed || !verifiedPaymentId) {
-      try {
-        const piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
-        if (piPayment && piPayment.data && piPayment.data.status && piPayment.data.status.developer_approved) {
-          verifiedPaymentId = paymentId;
-          console.log('Pi Platform API fallback verification passed for', paymentId);
-        } else {
-          return errorResponse('Payment verification failed', 400, 'verification_failed', env);
-        }
-      } catch (e) {
-        console.error('Pi Platform API fallback verification failed:', e);
+    // 验证支付：通过 Pi Platform API 获取支付信息，校验 developer_approved（服务端可信来源）
+    try {
+      const piPayment = await piPlatformRequest(`/v2/payments/${paymentId}`, 'GET', null, env);
+      if (!(piPayment && piPayment.data && piPayment.data.status && piPayment.data.status.developer_approved)) {
         return errorResponse('Payment verification failed', 400, 'verification_failed', env);
       }
-    }
-
-    // 验证 paymentId 匹配
-    if (verifiedPaymentId && verifiedPaymentId !== paymentId) {
-      return errorResponse('Payment ID mismatch', 400, 'mismatch', env);
+      console.log('Pi Platform API payment verification passed for', paymentId);
+    } catch (e) {
+      console.error('Pi Platform API payment verification failed:', e);
+      return errorResponse('Payment verification failed', 400, 'verification_failed', env);
     }
 
     // 更新或创建订单（统一用 'completed'）
@@ -988,6 +1007,7 @@ async function handleIncomplete(request, env) {
     } else {
       await createOrder({
         payment_id: paymentId,
+        buyer_id: buyerUid,
         status: 'completed',
         txid: txid || null,
         cancelled: false,

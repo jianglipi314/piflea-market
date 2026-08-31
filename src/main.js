@@ -83,17 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const darkToggle = document.getElementById('darkToggle');
   if (darkToggle) darkToggle.addEventListener('click', () => toggleDark());
 
-  const debugRefresh = document.getElementById('debug-refresh');
-  if (debugRefresh) debugRefresh.addEventListener('click', () => { import('./views/debug-auth').then(m => m.renderDebugAuth()); });
-
   const linkTerms = document.getElementById('link-terms');
   if (linkTerms) linkTerms.addEventListener('click', () => window.open('/terms.html', '_blank'));
   const linkPrivacy = document.getElementById('link-privacy');
   if (linkPrivacy) linkPrivacy.addEventListener('click', () => window.open('/privacy.html', '_blank'));
   const linkFeedback = document.getElementById('link-feedback');
   if (linkFeedback) linkFeedback.addEventListener('click', () => openSheet('feedback'));
-  const linkDebug = document.getElementById('link-debug');
-  if (linkDebug) linkDebug.addEventListener('click', () => goto('debug-auth'));
 
   const adminBack = document.getElementById('admin-back');
   if (adminBack) adminBack.addEventListener('click', () => goto('mine'));
