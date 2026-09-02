@@ -1067,6 +1067,28 @@ async function handleMyOrders(request, env) {
     const orders = await supabaseRequest(query, 'GET', null, env);
     console.log('[DEBUG my-orders] Supabase result count:', orders ? orders.length : 0);
 
+    // 买家侧展示用：按 product_id 补充 seller_name（仅展示，身份判定仍以 seller_id 为准）
+    // seller_name 只来自数据库 items.seller，不信任客户端传入
+    if (orders && orders.length) {
+      const productIds = [...new Set(orders.map((o) => o.product_id).filter(Boolean))];
+      let sellerMap = new Map();
+      if (productIds.length) {
+        try {
+          const inExpr = `(${productIds.map((id) => encodeURIComponent(id)).join(',')})`;
+          const items = await supabaseRequest(
+            `/items?id=in.${inExpr}&select=id,seller`,
+            'GET', null, env
+          );
+          sellerMap = new Map((items || []).map((it) => [String(it.id), it.seller]));
+        } catch (e) {
+          console.error('[DEBUG my-orders] failed to enrich seller_name:', e.message);
+        }
+      }
+      orders.forEach((o) => {
+        o.seller_name = sellerMap.get(String(o.product_id)) || null;
+      });
+    }
+
     return jsonResponse({
       success: true,
       data: orders || [],

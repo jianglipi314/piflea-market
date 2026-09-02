@@ -722,8 +722,8 @@ export function gotoOrderDetail(orderId) {
   const itemImage = item?.images?.[0] || '';
   const itemDesc = item?.description || '';
 
-  // 对方用户名：买家侧用商品卖家名，卖家侧用订单买家名快照；缺失回退 UID
-  const otherName = isBuyer ? (item?.seller || '') : (order.buyer_name || '');
+  // 对方用户名：买家侧用 Worker 补充的商品卖家名，卖家侧用订单买家名快照；缺失回退 UID
+  const otherName = isBuyer ? (order.seller_name || '') : (order.buyer_name || '');
   const otherUid = isBuyer ? (order.seller_id || '—') : (order.buyer_id || '—');
   const otherDisplay = otherName
     ? escapeHtml(otherName)
