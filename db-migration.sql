@@ -98,3 +98,10 @@ CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
 
 -- 刷新 schema cache（让 REST API 识别新表/新列）
 NOTIFY pgrst, 'reload schema';
+
+-- ========== 订单买家用户名快照 ==========
+-- 仅作展示用途：卖家查看收到订单时显示买家 Pi username
+-- UID（buyer_id）仍是唯一可信身份依据，buyer_name 不参与任何鉴权/归属/状态判断
+-- nullable、无默认值；老订单为 NULL 时前端回退显示 UID
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS buyer_name TEXT;
+NOTIFY pgrst, 'reload schema';

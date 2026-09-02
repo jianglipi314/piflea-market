@@ -641,6 +641,8 @@ async function handleApprove(request, env) {
       item_id: productId,
       buyer_id: piMeta.buyerId || body.buyerId || null,
       seller_id: piMeta.sellerId || body.sellerId || null,
+      // 买家用户名快照：仅作展示，身份判定始终以 buyer_id 为准
+      buyer_name: request.piUser?.username || null,
       item_title: piMeta.itemTitle || body.itemTitle || '',
       item_price: itemPriceSnapshot,
       shipping_fee: shippingFeeSnapshot,
@@ -664,6 +666,7 @@ async function handleApprove(request, env) {
       const updates = { status: 'approved', updated_at: new Date().toISOString() };
       if (!existing.buyer_id && orderData.buyer_id) updates.buyer_id = orderData.buyer_id;
       if (!existing.seller_id && orderData.seller_id) updates.seller_id = orderData.seller_id;
+      if (!existing.buyer_name && orderData.buyer_name) updates.buyer_name = orderData.buyer_name;
       if (!existing.item_title && orderData.item_title) updates.item_title = orderData.item_title;
       if ((!existing.item_price || existing.item_price == 0) && orderData.item_price) updates.item_price = orderData.item_price;
       await updateOrder(paymentId, updates, env);
@@ -855,6 +858,8 @@ async function handleComplete(request, env) {
     if (!existing.seller_id && completeMeta.sellerId) updates.seller_id = completeMeta.sellerId;
     if (!existing.product_id && completeMeta.itemId) updates.product_id = completeMeta.itemId;
     if (!existing.item_title && completeMeta.itemTitle) updates.item_title = completeMeta.itemTitle;
+    // 补偿买家用户名快照：老订单在买家确认收货时补写（仅展示，身份判定仍以 buyer_id 为准）
+    if (!existing.buyer_name && request.piUser?.username) updates.buyer_name = request.piUser.username;
 
     await updateOrder(paymentId, updates, env);
 
@@ -1506,7 +1511,7 @@ async function handleItemsCreate(request, env) {
     const uid = request.piUser.uid;
     const body = await request.json();
     // 字段白名单：只允许这些字段
-    const allowedFields = ['title', 'description', 'price', 'shipping_fee', 'category', 'city', 'images', 'contact', 'seller_name'];
+    const allowedFields = ['title', 'description', 'price', 'shipping_fee', 'category', 'city', 'images', 'contact', 'seller'];
     const itemData = { owner_id: uid, status: 'active', created_at: new Date().toISOString(), views: 0 };
     for (const key of allowedFields) {
       if (body[key] !== undefined) {
@@ -1545,7 +1550,7 @@ async function handleItemsUpdate(request, env) {
       return errorResponse('Not your item', 403, 'forbidden', env);
     }
     // 字段白名单（禁止修改 id、owner_id、price、status、views、created_at）
-    const allowedFields = ['title', 'description', 'shipping_fee', 'category', 'city', 'images', 'contact', 'seller_name'];
+    const allowedFields = ['title', 'description', 'shipping_fee', 'category', 'city', 'images', 'contact', 'seller'];
     const updateData = { updated_at: new Date().toISOString() };
     for (const key of allowedFields) {
       if (body[key] !== undefined) {

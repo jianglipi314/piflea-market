@@ -716,12 +716,18 @@ export function gotoOrderDetail(orderId) {
   const statusMap = { 'paid': '待发货', 'paid_pending_transfer': '待转账', 'shipped': '已发货', 'completed': '已完成' };
   const isBuyer = role === 'buyer';
   const otherLabel = isBuyer ? '卖家' : '买家';
-  const otherUid = isBuyer ? (order.seller_uid || order.seller_id || '—') : (order.buyer_uid || order.buyer_id || '—');
 
   // 通过 product_id 关联商品信息
   const item = order.product_id ? state.items.find((it) => String(it.id) === String(order.product_id)) : null;
   const itemImage = item?.images?.[0] || '';
   const itemDesc = item?.description || '';
+
+  // 对方用户名：买家侧用商品卖家名，卖家侧用订单买家名快照；缺失回退 UID
+  const otherName = isBuyer ? (item?.seller || '') : (order.buyer_name || '');
+  const otherUid = isBuyer ? (order.seller_id || '—') : (order.buyer_id || '—');
+  const otherDisplay = otherName
+    ? escapeHtml(otherName)
+    : ('UID：' + (otherUid.length > 16 ? otherUid.slice(0, 16) + '...' : otherUid));
 
   const html =
     '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
@@ -748,7 +754,7 @@ export function gotoOrderDetail(orderId) {
     '</div>' +
     '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
       '<div style="font-weight:700;font-size:14px;margin-bottom:10px">👤 交易对方</div>' +
-      '<div style="font-size:14px">' + otherLabel + 'UID：' + (otherUid.length > 16 ? otherUid.slice(0, 16) + '...' : otherUid) + '</div>' +
+      '<div style="font-size:14px">' + otherLabel + '：' + otherDisplay + '</div>' +
     '</div>' +
     (order.shipping_company || order.tracking_no
       ? '<div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:12px">' +
