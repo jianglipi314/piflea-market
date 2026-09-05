@@ -935,31 +935,30 @@
 }
 .chat-item .time { font-size: 12px; color: var(--ink-2); }
 
+/* 聊天页改为全屏 fixed 覆盖层：
+   1) chat-head / chat-input 作为 flex 子项分别钉在顶部/底部，msg-area 居中独立滚动，
+      从根本上杜绝「消息滚到边界后整页跟随移动」的滚动链问题（之前依赖 body 的
+      overflow-x:hidden + 100dvh，滚链会传导到根元素）。
+   2) 软键盘弹出时输入框上移：JS 以 visualViewport 为锚点，把可见视口高度镜像到
+      --vvh（容器高度随之收缩、底部贴到键盘上方），把 offsetTop 镜像到 --vvt
+      （用 transform 平移补正 adjustPan 内核下 fixed 元素的位移）。 */
 .view#view-chat.active {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 124px);
-  height: calc(100dvh - 124px);
-  overflow: hidden;
-}
-
-/* 聊天输入框获得焦点（键盘弹出）时隐藏底部导航，避免遮挡输入框 */
-.view#view-chat.active:focus-within ~ .nav {
-  display: none;
-}
-
-/* 键盘弹出时同时隐藏顶部栏，让聊天区域从屏幕顶部开始，去除顶部预留空白 */
-@supports selector(:has(*)) {
-  body:has(#view-chat.active:focus-within) .topbar {
-    display: none;
-  }
-}
-
-/* 键盘弹出：顶部栏/底部导航均已隐藏，高度直接等于可视区，
-   输入框底部严格贴住键盘顶部，不再额外减去 magic number */
-.view#view-chat.active:focus-within {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 100vh;
   height: 100dvh;
+  height: var(--vvh, 100dvh);
+  transform: translateY(var(--vvt, 0px));
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  z-index: 40;
+  overflow: hidden;
 }
 
 .chat-head {
@@ -991,6 +990,7 @@
 .msg-area {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   min-height: 0;
   display: flex;
   flex-direction: column;
