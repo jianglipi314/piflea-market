@@ -163,7 +163,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 600));
     });
     // blur 收不到时用 focusout 兜底（覆盖更多内核的收键盘场景）
-    const onFocusOut = () => {
+    const onFocusOut = (e) => {
+      // 焦点移向发送按钮时不回位：点发送后键盘应保持弹出（sendMsg 会拉回焦点）
+      const rt = e && e.relatedTarget;
+      if (rt && chatSendBtnEl && chatSendBtnEl.contains(rt)) return;
       // 键盘已收起：先清掉 focus 残留定时器，再清除变量，恢复 CSS 默认全屏高度，避免输入框悬空
       clearFocusTimers();
       stopPolling();

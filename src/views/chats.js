@@ -28,7 +28,9 @@ export function initChatButtons() {
     sendBtn._bound = true;
     // 点发送按钮不夺走输入框焦点（preventDefault 阻止聚焦），键盘保持弹出，
     // 发送后可继续输入；click 仍正常触发，不影响发送。
+    // pointerdown + mousedown 双拦截：部分 WebView 内核在 mousedown 阶段决定焦点。
     sendBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+    sendBtn.addEventListener('mousedown', (e) => e.preventDefault());
     sendBtn.addEventListener('click', sendMsg);
   }
   const chatInput = document.getElementById('chatInput');
@@ -399,11 +401,22 @@ export async function sendMsg() {
   const myIds = getAllMyUserIds();
   const me = myIds.includes(uid1) ? uid1 : uid2;
   const other = me === uid1 ? uid2 : uid1;
+
+  // 派浏览器内核点按钮时可能原生夺走输入框焦点导致键盘收起：
+  // 发送时输入框聚焦（或键盘处于抬升状态）→ 发送过程中/结束后把焦点拉回，键盘保持弹出。
+  const chatView = document.getElementById('view-chat');
+  const kbRaised = chatView && chatView.getBoundingClientRect().height < window.innerHeight - 100;
+  const keepKb = document.activeElement === inp || kbRaised;
+  const refocusInput = () => {
+    if (keepKb) inp.focus();
+  };
+
   inp.value = '';
 
   // Optimistic update with pending flag
   messagesCache.push({ from: 'me', text, t: Date.now(), pending: true });
   renderBubbles();
+  refocusInput();
 
   try {
     const res = await apiFetch('/api/chat/send', {
@@ -425,6 +438,7 @@ export async function sendMsg() {
     messagesCache = messagesCache.filter(m => m.text !== text || !m.pending);
     renderBubbles();
   }
+  refocusInput();
   loadChatList();
 }
 
