@@ -57,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // focus/blur 用分阶段延迟采样覆盖软键盘弹出/收起的动画过程。
   const chatViewportEl = document.getElementById('view-chat');
   const chatInputEl = document.getElementById('chatInput');
+  const chatSendBtnEl = document.getElementById('chat-send-btn');
+  const msgAreaEl = document.getElementById('msgArea');
   const rootEl = document.documentElement;
   const syncChatViewport = () => {
     const vv = window.visualViewport;
@@ -176,15 +178,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const collapseOnOutsideTouch = (e) => {
       if (keyboardMode === 'auto') return;
       if (e.target && chatInputEl.contains(e.target)) return;
+      // 点发送按钮不视为「收起键盘」：发送后键盘保持弹出，继续输入
+      if (e.target && chatSendBtnEl && chatSendBtnEl.contains(e.target)) return;
       collapseChat();
       // 顺带把焦点从输入框移走，避免键盘仍弹着时输入框继续保持聚焦
       if (document.activeElement === chatInputEl) chatInputEl.blur();
     };
     document.addEventListener('touchstart', collapseOnOutsideTouch, { capture: true, passive: true });
     document.addEventListener('mousedown', collapseOnOutsideTouch, { capture: true });
-    // 收键盘后滑动/滚动页面也应回位（capture 可捕获 msg-area 内部滚动）
-    document.addEventListener('scroll', () => {
-      if (keyboardMode !== 'auto') collapseChat();
+    // 收键盘后滑动/滚动页面也应回位（capture 可捕获 msg-area 内部滚动）。
+    // 例外：输入框仍聚焦时消息区的滚动不回位——发送消息后 renderBubbles 会程序化
+    // 滚动到底部，此时键盘还开着，不能把输入框降回去。
+    document.addEventListener('scroll', (e) => {
+      if (keyboardMode === 'auto') return;
+      if (
+        document.activeElement === chatInputEl &&
+        e.target && e.target === msgAreaEl
+      ) return;
+      collapseChat();
     }, { capture: true, passive: true });
   }
   // 进入/离开聊天页（active 类切换，含从 chats.js 直接切换）时即时同步一次

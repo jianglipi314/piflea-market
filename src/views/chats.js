@@ -26,6 +26,9 @@ export function initChatButtons() {
   const sendBtn = document.getElementById('chat-send-btn');
   if (sendBtn && !sendBtn._bound) {
     sendBtn._bound = true;
+    // 点发送按钮不夺走输入框焦点（preventDefault 阻止聚焦），键盘保持弹出，
+    // 发送后可继续输入；click 仍正常触发，不影响发送。
+    sendBtn.addEventListener('pointerdown', (e) => e.preventDefault());
     sendBtn.addEventListener('click', sendMsg);
   }
   const chatInput = document.getElementById('chatInput');
