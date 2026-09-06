@@ -6,6 +6,7 @@ import { escapeHtml, fmtPrice, timeAgo, fallbackCopy, toast, getAllMyUserIds, ge
 import { openSheet } from '../components/sheet';
 import { apiFetch } from '../api';
 import { getPiUser } from '../pi-sdk';
+import { pushViewHistory } from '../router';
 
 let heroImgIdx = 0;
 
@@ -237,6 +238,9 @@ export async function openDetail(id) {
   // 更新顶部标题为"商品详情"
   document.getElementById('topTitle').textContent = '商品详情';
   document.getElementById('topSub').textContent = '平台担保交易 · 收货后放款';
+
+  // 纳入浏览器历史（系统返回键按真实路径逐级返回；detailReturnTo 保留兜底）
+  pushViewHistory('detail', '商品详情', '平台担保交易 · 收货后放款');
 
   // Populate fields
   document.getElementById('d-title').textContent = it.title;

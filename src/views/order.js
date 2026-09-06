@@ -1,7 +1,7 @@
 import { state } from '../main';
 import { escapeHtml, fmtPrice, toast } from '../utils';
 import { createPiPayment, isPiAuthenticated, getPiUser } from '../pi-sdk';
-import { goto } from '../router';
+import { goto, pushViewHistory } from '../router';
 import { apiFetch, BACKEND_URL as BACKEND } from '../api';
 import { loadOrders, switchMine } from './mine';
 import { PROVINCE_CITY } from '../data/region.js';
@@ -79,6 +79,9 @@ export function openOrder(id) {
   // 更新顶部标题
   document.getElementById('topTitle').textContent = '确认订单';
   document.getElementById('topSub').textContent = '请核对商品信息后支付';
+
+  // 纳入浏览器历史（系统返回键按真实路径逐级返回）
+  pushViewHistory('order', '确认订单', '请核对商品信息后支付');
 
   // 兜底：确保返回按钮事件绑定有效
   const backBtn = document.getElementById('o-back-btn');

@@ -631,36 +631,47 @@ export async function loadOrders(role) {
   const orderList = document.getElementById('orderList');
   const orderEmpty = document.getElementById('orderEmpty');
 
-  // 只有当前在订单 tab 才显示加载
+  // 订单 tab 才操作订单列表 UI；其他场景（概览页/启动预加载）静默获取数据
   const activeTab = state.mineTab;
-  if (activeTab !== 'buy' && activeTab !== 'sell') {
-    return;
-  }
+  const inOrderTab = activeTab === 'buy' || activeTab === 'sell';
 
-  orderLoader.style.display = 'block';
-  orderList.innerHTML = '';
-  orderEmpty.style.display = 'none';
+  if (inOrderTab) {
+    orderLoader.style.display = 'block';
+    orderList.innerHTML = '';
+    orderEmpty.style.display = 'none';
+  }
 
   const user = getPiUser();
   if (!user) {
-    orderLoader.style.display = 'none';
-    orderEmpty.style.display = 'block';
-    orderEmpty.textContent = '请先登录 Pi 账号';
+    if (inOrderTab) {
+      orderLoader.style.display = 'none';
+      orderEmpty.style.display = 'block';
+      orderEmpty.textContent = '请先登录 Pi 账号';
+    }
     return;
   }
 
   try {
     const res = await apiFetch('/api/my-orders?uid=' + encodeURIComponent(user.uid) + '&role=' + role);
     const json = await res.json();
-    orderLoader.style.display = 'none';
+    if (inOrderTab) orderLoader.style.display = 'none';
 
     if (!res.ok || !json.success) {
-      orderEmpty.style.display = 'block';
-      orderEmpty.textContent = json.message || '加载订单失败';
+      if (inOrderTab) {
+        orderEmpty.style.display = 'block';
+        orderEmpty.textContent = json.message || '加载订单失败';
+      }
       return;
     }
 
     const orders = json.data || [];
+
+    // 缓存订单数据，详情页使用；缓存更新后刷新交易统计（静默模式也执行，概览页数字因此生效）
+    cachedOrders[role] = orders;
+    updateMineStats();
+
+    // 静默模式到此为止：非订单 tab 只需统计数字，不渲染订单列表
+    if (!inOrderTab) return;
 
     if (orders.length === 0) {
       orderEmpty.style.display = 'block';
@@ -669,11 +680,6 @@ export async function loadOrders(role) {
     }
 
     const statusMap = { 'pending': '处理中', 'approved': '支付中', 'paid': '待发货', 'paid_pending_transfer': '待转账', 'shipped': '已发货', 'completed': '已完成' };
-
-    // 缓存订单数据，详情页使用
-    cachedOrders[role] = orders;
-    // 订单缓存更新后刷新交易统计
-    updateMineStats();
 
     orderList.innerHTML = orders.map(function(o) {
       return '<div class="row-item" data-action="gotoOrder" data-id="' + o.id + '" style="cursor:pointer">' +
@@ -697,9 +703,12 @@ export async function loadOrders(role) {
       '</div>';
     }).join('');
   } catch (e) {
-    orderLoader.style.display = 'none';
-    orderEmpty.style.display = 'block';
-    orderEmpty.textContent = '加载失败：' + e.message;
+    // 静默模式失败不打扰用户，统计保持原值
+    if (inOrderTab) {
+      orderLoader.style.display = 'none';
+      orderEmpty.style.display = 'block';
+      orderEmpty.textContent = '加载失败：' + e.message;
+    }
   }
 }
 

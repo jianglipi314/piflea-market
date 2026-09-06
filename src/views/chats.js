@@ -3,6 +3,7 @@
 import { state } from '../main';
 import { apiFetch } from '../api';
 import { escapeHtml, timeAgo, toast, getAllMyUserIds, getCurrentUserId, getPiUid } from '../utils';
+import { pushViewHistory } from '../router';
 
 const CHATS_VIEWED_KEY = 'pi_flea_chats_viewed_v1';
 // 会话级已读时间戳（纯前端展示，不涉及数据库）
@@ -292,6 +293,9 @@ async function openChatReal(item, otherUid) {
   document.getElementById('chat-sub').textContent =
     '关于「' + (item.title || '闲置') + '」';
   document.getElementById('chat-avatar').textContent = (item.seller || '?').slice(0, 1);
+
+  // 纳入浏览器历史（系统返回键按真实路径逐级返回；标题快照进历史条目，popstate 时恢复）
+  pushViewHistory('chat', '聊天', '关于「' + (item.title || '闲置') + '」');
 
   await loadMessages(item.id, me, otherUid);
   subscribeMessages(item.id, me, otherUid);
